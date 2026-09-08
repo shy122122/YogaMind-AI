@@ -1,0 +1,11 @@
+.env
+backend/.env
+__pycache__/
+*.py[cod]
+outputs/*.zip
+.npm-cache/
+backend/.venv/
+**/__pycache__/
+*.log
+outputs/*-check.png
+outputs/YogaMind-AI-review-package/
