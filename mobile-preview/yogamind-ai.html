@@ -1053,7 +1053,18 @@
       }
 
       function isReliableLandmark(point) {
-        return Boolean(point && (point.visibility === undefined || point.visibility > 0.52));
+        if (!point) return false;
+        const visibility = Number(point.visibility);
+        const presence = Number(point.presence);
+        if (Number.isFinite(visibility)) return visibility > 0.18;
+        if (Number.isFinite(presence)) return presence > 0.18;
+        return true;
+      }
+
+      function countReliableLandmarks(landmarks) {
+        return Array.isArray(landmarks)
+          ? landmarks.reduce((count, point) => count + (isReliableLandmark(point) ? 1 : 0), 0)
+          : 0;
       }
 
 
@@ -2681,6 +2692,7 @@
         const currentPoseRef = useRef(currentPose);
         const deviationStartedAtRef = useRef(null);
         const lastPoseUiUpdateRef = useRef(0);
+        const poseHealthRef = useRef({ noPoseSince: null, lastHintAt: 0, lastSendErrorAt: 0 });
         const errorEpisodeReportedRef = useRef(false);
         const [useMock, setUseMock] = useState(false);
         const [mobileDemoOpen, setMobileDemoOpen] = useState(false);
@@ -2702,6 +2714,8 @@
         const lastSpokenAtRef = useRef({});
         const speakingRef = useRef(false);
         const speechTimerRef = useRef(null);
+        const [voiceReady, setVoiceReady] = useState(false);
+        const [voiceNotice, setVoiceNotice] = useState("");
         const timeLabel = formatTimer(secondsLeft);
         const poseDuration = Math.max(1, currentPose?.duration_sec || 60);
         const progress = Math.max(8, ((poseDuration - secondsLeft) / poseDuration) * 100);
@@ -2730,6 +2744,67 @@
         const angleLabel = Number.isFinite(poseMeta.angle)
           ? `${poseMeta.label} ${poseMeta.angle}°`
           : poseMeta.label;
+
+        const speakText = (text, { bypassThrottle = false } = {}) => {
+          if (muted && !bypassThrottle) return false;
+          if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+            setVoiceNotice("当前浏览器不支持语音播报，可继续使用文字提醒。");
+            return false;
+          }
+
+          const now = Date.now();
+          const lastSpokenAt = lastSpokenAtRef.current[text] || 0;
+          if (!bypassThrottle && (speakingRef.current || now - lastSpokenAt < TTS_THROTTLE_MS)) {
+            return false;
+          }
+
+          lastSpokenAtRef.current[text] = now;
+          speakingRef.current = true;
+          setSpeaking(true);
+          setVoiceReady(true);
+          setVoiceNotice("语音提醒已开启");
+
+          const finishSpeaking = () => {
+            speakingRef.current = false;
+            setSpeaking(false);
+          };
+
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = "zh-CN";
+          utterance.rate = 0.88;
+          utterance.pitch = 1;
+          utterance.volume = 0.78;
+          utterance.onend = finishSpeaking;
+          utterance.onerror = () => {
+            setVoiceNotice("语音播报被浏览器拦截，请再点一次语音试播。");
+            finishSpeaking();
+          };
+          window.speechSynthesis.speak(utterance);
+
+          if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
+          speechTimerRef.current = window.setTimeout(finishSpeaking, 3800);
+          return true;
+        };
+
+        const handleVoiceButtonClick = () => {
+          if (muted) {
+            setMuted(false);
+            window.setTimeout(() => speakText("语音提醒已开启，我会在需要时轻声提示你。", { bypassThrottle: true }), 0);
+            return;
+          }
+
+          if (!voiceReady) {
+            speakText("语音提醒已开启，我会在需要时轻声提示你。", { bypassThrottle: true });
+            return;
+          }
+
+          setMuted(true);
+          setVoiceNotice("语音提醒已关闭");
+          if (window.speechSynthesis) window.speechSynthesis.cancel();
+          setSpeaking(false);
+          speakingRef.current = false;
+        };
 
         useEffect(() => {
           pausedRef.current = paused;
@@ -2897,10 +2972,26 @@
                 smoothLandmarks: true,
                 minDetectionConfidence: 0.5,
                 minTrackingConfidence: 0.5,
+                selfieMode: cameraMode === "front",
               });
               pose.onResults((results) => {
                 if (cancelled) return;
                 const landmarks = results.poseLandmarks || [];
+                const reliableCount = countReliableLandmarks(landmarks);
+                const health = poseHealthRef.current;
+                const now = performance.now();
+
+                if (reliableCount > 0) {
+                  health.noPoseSince = null;
+                  setCameraIssue("");
+                } else {
+                  if (!health.noPoseSince) health.noPoseSince = now;
+                  if (now - health.noPoseSince > 1600 && now - health.lastHintAt > 1400) {
+                    health.lastHintAt = now;
+                    setCameraIssue("还没捕捉到身体关键点，请退后一点，并让头部和肩膀进入画面。");
+                  }
+                }
+
                 const latestPose = currentPoseRef.current || currentPose;
                 const analysis = evaluatePoseDeviation(landmarks, latestPose);
                 const activeErrorIndices = processPoseResult(analysis);
@@ -2916,7 +3007,16 @@
               const detectFrame = async () => {
                 if (cancelled || !poseRef.current) return;
                 if (!pausedRef.current && video.readyState >= 2) {
-                  await poseRef.current.send({ image: video });
+                  try {
+                    await poseRef.current.send({ image: video });
+                  } catch (sendError) {
+                    const health = poseHealthRef.current;
+                    const now = performance.now();
+                    if (now - health.lastSendErrorAt > 2200) {
+                      health.lastSendErrorAt = now;
+                      setCameraIssue("姿态识别模型正在加载或网络资源较慢，请稍等；若一直没有节点，可切换离线体验。");
+                    }
+                  }
                 }
                 frameRef.current = window.requestAnimationFrame(detectFrame);
               };
@@ -2993,32 +3093,7 @@
           }
 
           const trySpeak = () => {
-            const now = Date.now();
-            const lastSpokenAt = lastSpokenAtRef.current[correctionTip] || 0;
-            if (speakingRef.current || now - lastSpokenAt < TTS_THROTTLE_MS) return;
-
-            lastSpokenAtRef.current[correctionTip] = now;
-            speakingRef.current = true;
-            setSpeaking(true);
-
-            const finishSpeaking = () => {
-              speakingRef.current = false;
-              setSpeaking(false);
-            };
-
-            if (window.speechSynthesis && window.SpeechSynthesisUtterance) {
-              window.speechSynthesis.cancel();
-              const utterance = new SpeechSynthesisUtterance(correctionTip);
-              utterance.lang = "zh-CN";
-              utterance.rate = 0.88;
-              utterance.pitch = 1;
-              utterance.volume = 0.78;
-              utterance.onend = finishSpeaking;
-              utterance.onerror = finishSpeaking;
-              window.speechSynthesis.speak(utterance);
-            }
-
-            speechTimerRef.current = window.setTimeout(finishSpeaking, 3800);
+            speakText(correctionTip);
           };
 
           trySpeak();
@@ -3228,7 +3303,17 @@
                 <div className="absolute left-4 top-14 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md">
                   {angleLabel}
                 </div>
-                <div className="absolute left-4 top-24 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md">
+                {cameraIssue && cameraState === "ready" && !useMock && (
+                  <div className="absolute inset-x-4 top-24 rounded-[18px] border border-white/18 bg-white/88 px-4 py-3 text-xs font-semibold leading-relaxed text-forest/76 shadow-sm backdrop-blur-md">
+                    {cameraIssue}
+                  </div>
+                )}
+                <div
+                  className={[
+                    "absolute left-4 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md transition-all",
+                    cameraIssue && cameraState === "ready" && !useMock ? "top-[150px]" : "top-24",
+                  ].join(" ")}
+                >
                   温柔提醒 {Object.values(errorCounts || {}).reduce((sum, value) => sum + value, 0)} 次
                 </div>
 
@@ -3255,13 +3340,14 @@
                   pendingCorrection={pendingCorrection}
                   message={coachTip}
                   frame={voiceFrame}
+                  voiceNotice={voiceNotice}
                 />
 
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   <ControlButton
                     icon="voice"
-                    label={muted ? "打开语音" : "关闭语音"}
-                    onClick={() => setMuted((value) => !value)}
+                    label={muted ? "打开语音" : voiceReady ? "关闭语音" : "语音试播"}
+                    onClick={handleVoiceButtonClick}
                   />
                   <ControlButton
                     icon="camera"
@@ -3712,7 +3798,7 @@
         );
       }
 
-      function CoachCompanion({ speaking, formError, pendingCorrection, message, frame = 0 }) {
+      function CoachCompanion({ speaking, formError, pendingCorrection, message, frame = 0, voiceNotice = "" }) {
         const shortMessage = formError
           ? "慢一点，肩膀再松一些。"
           : pendingCorrection
@@ -3749,6 +3835,9 @@
                 {speaking && <AIWaveform frame={frame} compact />}
               </div>
               <p className="mt-1 text-sm leading-5 text-forest/70 sm:leading-6">{shortMessage}</p>
+              {voiceNotice && (
+                <p className="mt-1 text-[11px] font-semibold text-sage/70">{voiceNotice}</p>
+              )}
             </div>
           </div>
         );
@@ -4194,8 +4283,4 @@
     </script>
   </body>
 </html>
-
-
-
-
 
