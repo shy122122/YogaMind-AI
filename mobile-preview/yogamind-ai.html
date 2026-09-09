@@ -963,6 +963,18 @@
         0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 31, 32,
       ]);
 
+      const POSE_PATTERN_LABELS = {
+        standing: "站姿",
+        all_fours: "四足跪姿",
+        mat_fold: "垫面前屈",
+        seated: "坐姿",
+        side_bend: "站姿侧伸展",
+        forward_fold: "站姿前屈",
+        lunge: "弓步",
+        bridge: "桥式",
+        supine_twist: "仰卧扭转",
+      };
+
       function calculateAngle(pointA, pointB, pointC) {
         if (!pointA || !pointB || !pointC) return null;
         const radians =
@@ -975,6 +987,134 @@
 
       function isReliableLandmark(point) {
         return Boolean(point && (point.visibility === undefined || point.visibility > 0.52));
+      }
+
+
+      function getPointCenter(...points) {
+        const reliable = points.filter(isReliableLandmark);
+        if (!reliable.length) return null;
+        return {
+          x: reliable.reduce((sum, point) => sum + point.x, 0) / reliable.length,
+          y: reliable.reduce((sum, point) => sum + point.y, 0) / reliable.length,
+        };
+      }
+
+      function getExpectedPosePattern(poseConfig = {}) {
+        const visualKey =
+          poseConfig.demo_visual_key ||
+          inferDemoVisualKey(poseConfig.pose_name, poseConfig.pose_id);
+        const patternMap = {
+          standing_breath: "standing",
+          mountain: "standing",
+          cat_cow: "all_fours",
+          child_pose: "mat_fold",
+          seated_neck: "seated",
+          side_bend: "side_bend",
+          half_forward_fold: "forward_fold",
+          low_lunge: "lunge",
+          bridge: "bridge",
+          supine_twist: "supine_twist",
+        };
+        return patternMap[visualKey] || "standing";
+      }
+
+      function classifyPosePattern(landmarks) {
+        const bodyPoints = Array.from(BODY_KEYPOINT_INDICES)
+          .map((index) => landmarks[index])
+          .filter(isReliableLandmark);
+        if (bodyPoints.length < 8) return { pattern: "unknown", confidence: 0 };
+
+        const minX = Math.min(...bodyPoints.map((point) => point.x));
+        const maxX = Math.max(...bodyPoints.map((point) => point.x));
+        const minY = Math.min(...bodyPoints.map((point) => point.y));
+        const maxY = Math.max(...bodyPoints.map((point) => point.y));
+        const bodyWidth = Math.max(0.01, maxX - minX);
+        const bodyHeight = Math.max(0.01, maxY - minY);
+        const shoulder = getPointCenter(landmarks[11], landmarks[12]);
+        const hip = getPointCenter(landmarks[23], landmarks[24]);
+        const knee = getPointCenter(landmarks[25], landmarks[26]);
+        const ankle = getPointCenter(landmarks[27], landmarks[28], landmarks[31], landmarks[32]);
+        const wrist = getPointCenter(landmarks[15], landmarks[16]);
+        const head = getPointCenter(landmarks[0], landmarks[7], landmarks[8]);
+
+        if (!shoulder || !hip) return { pattern: "unknown", confidence: 0 };
+
+        const torsoDx = Math.abs(shoulder.x - hip.x);
+        const torsoDy = Math.abs(shoulder.y - hip.y);
+        const isHorizontalBody = bodyWidth > bodyHeight * 1.22 || torsoDx > torsoDy * 1.25;
+        const isVerticalBody = bodyHeight > bodyWidth * 1.12 && torsoDy > torsoDx * 1.05;
+        const lowerBodyVisible = Boolean(knee && ankle);
+        const shoulderAboveHip = shoulder.y < hip.y - 0.08;
+        const handsNearFloor = wrist ? wrist.y > shoulder.y + 0.18 : false;
+        const kneesNearHands = wrist && knee ? Math.abs(wrist.y - knee.y) < 0.2 : false;
+        const hipsLow = hip.y > 0.48;
+
+        if (lowerBodyVisible) {
+          const rightKneeAngle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+          const leftKneeAngle = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+          const kneeAngles = [rightKneeAngle, leftKneeAngle].filter(Number.isFinite);
+          const hasBentKnee = kneeAngles.some((angle) => angle > 70 && angle < 135);
+          const hasLongStride = bodyWidth > 0.48 && ankle && knee && Math.abs(ankle.x - knee.x) > 0.12;
+          if (hasBentKnee && hasLongStride && bodyHeight > 0.45) {
+            return { pattern: "lunge", confidence: 0.78 };
+          }
+        }
+
+        if (isHorizontalBody && handsNearFloor && kneesNearHands && hip.y > shoulder.y - 0.06) {
+          return { pattern: "all_fours", confidence: 0.82 };
+        }
+
+        if (isHorizontalBody && hip.y > 0.5 && head && head.y > hip.y - 0.18 && bodyHeight < 0.46) {
+          const isBridgeLike = knee && shoulder && hip.y < knee.y - 0.05 && shoulder.y > hip.y - 0.04;
+          if (isBridgeLike) return { pattern: "bridge", confidence: 0.72 };
+          const isTwistLike = bodyWidth > 0.56 && lowerBodyVisible;
+          if (isTwistLike) return { pattern: "supine_twist", confidence: 0.7 };
+          return { pattern: "mat_fold", confidence: 0.64 };
+        }
+
+        if (isHorizontalBody && hip.y > 0.44 && handsNearFloor) {
+          return { pattern: "mat_fold", confidence: 0.72 };
+        }
+
+        if (hipsLow && knee && Math.abs(knee.y - hip.y) < 0.18 && bodyWidth > bodyHeight * 0.78) {
+          return { pattern: "seated", confidence: 0.76 };
+        }
+
+        if (isVerticalBody && lowerBodyVisible && shoulderAboveHip && hip.y > 0.34) {
+          const sideOffset = Math.abs((head?.x || shoulder.x) - hip.x);
+          const forwardFoldLike = shoulder.y > hip.y - 0.08 && torsoDx > torsoDy * 0.6;
+          if (forwardFoldLike) return { pattern: "forward_fold", confidence: 0.76 };
+          if (sideOffset > bodyWidth * 0.18) return { pattern: "side_bend", confidence: 0.68 };
+          return { pattern: "standing", confidence: 0.84 };
+        }
+
+        return { pattern: "unknown", confidence: 0.24 };
+      }
+
+      function evaluatePosePatternMismatch(landmarks, poseConfig = {}) {
+        const expected = getExpectedPosePattern(poseConfig);
+        const actual = classifyPosePattern(landmarks);
+        if (actual.pattern === "unknown" || actual.confidence < 0.62) {
+          return { mismatched: false, expected, actual };
+        }
+
+        const compatible = {
+          standing: ["standing", "side_bend"],
+          side_bend: ["side_bend", "standing"],
+          forward_fold: ["forward_fold", "standing"],
+          bridge: ["bridge", "supine_twist"],
+          supine_twist: ["supine_twist", "bridge"],
+        };
+        const allowed = compatible[expected] || [expected];
+        const mismatched = !allowed.includes(actual.pattern);
+        return {
+          mismatched,
+          expected,
+          actual,
+          label: "动作不匹配",
+          tip: "现在识别到的是" + (POSE_PATTERN_LABELS[actual.pattern] || "其他动作") + "，请先回到示范里的" + (POSE_PATTERN_LABELS[expected] || "当前动作") + "。",
+          errorIndices: [11, 12, 23, 24, 25, 26],
+        };
       }
 
       function evaluatePoseDeviation(landmarks, poseConfig = FALLBACK_COURSE.poses[0]) {
@@ -1009,6 +1149,20 @@
             angle: null,
             errorIndices: [],
             label: `${getCameraModeMeta(cameraModeRequired).short}关键点不足`,
+            framing,
+          };
+        }
+
+        const patternMismatch = evaluatePosePatternMismatch(landmarks, poseConfig);
+        if (patternMismatch.mismatched) {
+          return {
+            hasPose: true,
+            hasDeviation: true,
+            visibleCount,
+            angle: null,
+            errorIndices: patternMismatch.errorIndices,
+            label: patternMismatch.label,
+            tip: patternMismatch.tip,
             framing,
           };
         }
@@ -2318,6 +2472,7 @@
           angle: null,
           visibleCount: 0,
           label: "等待识别",
+          tip: null,
           framing: null,
         });
         const [speaking, setSpeaking] = useState(false);
@@ -2329,6 +2484,7 @@
         const poseDuration = Math.max(1, currentPose?.duration_sec || 60);
         const progress = Math.max(8, ((poseDuration - secondsLeft) / poseDuration) * 100);
         const correctionTip =
+          poseMeta.tip ||
           currentPose?.guidance_tip ||
           "请注意向下沉肩，拉伸脊柱。先把动作放小，再慢慢找回呼吸。";
         const targetMin = currentPose?.target_angle_min ?? 140;
@@ -2400,6 +2556,7 @@
               angle: analysis.angle,
               visibleCount: analysis.visibleCount,
               label: analysis.label,
+              tip: analysis.tip || null,
               framing: analysis.framing || null,
             });
           }
@@ -2566,6 +2723,7 @@
             angle: mockSignal ? 126 : 164,
             visibleCount: 33,
             label: "模拟脊柱线",
+            tip: null,
             framing: {
               isFar: currentPoseRef.current?.camera_mode_required === "full_body",
               label: "远距离大字模式",
