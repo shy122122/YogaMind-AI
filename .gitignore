@@ -9,3 +9,8 @@ backend/.venv/
 *.log
 outputs/*-check.png
 outputs/YogaMind-AI-review-package/
+
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/tsconfig.tsbuildinfo

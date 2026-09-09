@@ -193,6 +193,22 @@
 
       const API_BASE_URL = getApiBaseUrl();
       const DEBUG_MODE = new URLSearchParams(window.location.search).get("debug") === "1";
+      const ONBOARDING_STEPS = [
+        { title: "先把手机放稳", text: "把手机斜靠在杯子或支架上，镜头朝向瑜伽垫。站远一点也没关系，练习时我会放大关键提示。", tag: "手机摆放" },
+        { title: "先看示范，再跟着做", text: "每个动作开始前会先给你看标准示范。动作不用做到很大，只要舒服、稳定、能呼吸就很好。", tag: "动作理解" },
+        { title: "练习时主要听提醒", text: "如果你离屏幕比较远，我会自动切到大字模式。语音会低频提醒，不会一直打断你。", tag: "轻声陪练" },
+      ];
+      const TRACKING_QUALITY_META = {
+        stable: { label: "识别稳定", helper: "身体线条清楚，可以继续保持。", tone: "bg-lime text-night" },
+        partial_body: { label: "关键点不足", helper: "请让头部、肩膀和髋部尽量入镜。", tone: "bg-white/88 text-forest" },
+        low_light: { label: "光线偏暗", helper: "打开一盏灯，或让身体面对更亮的位置。", tone: "bg-[#FFF3EB] text-clay" },
+        no_pose: { label: "等待入镜", helper: "请后退一点，让头部和肩膀进入画面。", tone: "bg-white/88 text-forest" },
+      };
+      const POSE_ENTRY_INSTRUCTIONS = {
+        standing: "先站到垫子中央，双脚踩稳，让头顶和肩膀进入画面。", all_fours: "先回到垫面四足跪姿，双手撑地，膝盖落在髋部下方。", mat_fold: "先跪坐到垫子上，身体向前放松，额头靠近垫面。", seated: "先坐稳，背部轻轻立起来，肩膀自然下沉。", side_bend: "先站稳，再把一侧手臂向上伸展，身体轻轻侧弯。", forward_fold: "先双脚站稳，膝盖微弯，背部向前拉长。", lunge: "先把一只脚向前迈大步，前膝对准脚尖，身体保持稳定。", bridge: "先仰卧屈膝，双脚踩地，再慢慢抬起骨盆。", supine_twist: "先仰卧到垫子上，肩膀放松，再让膝盖慢慢倒向一侧。", unknown: "先对照示范，把身体摆到相同的起始姿势。",
+      };
+      function getPoseEntryInstruction(pattern) { return POSE_ENTRY_INSTRUCTIONS[pattern] || POSE_ENTRY_INSTRUCTIONS.unknown; }
+      function getTrackingQualityMeta(quality) { return TRACKING_QUALITY_META[quality] || TRACKING_QUALITY_META.no_pose; }
       const DEMO_PLACEHOLDER_SVG =
         "data:image/svg+xml;charset=UTF-8," +
         encodeURIComponent(`
@@ -1303,9 +1319,7 @@
             tip:
               "现在更像" +
               (POSE_VISUAL_LABELS[templateMatch.key] || POSE_PATTERN_LABELS[templateMatch.pattern] || "其他动作") +
-              "，请先回到示范里的" +
-              (POSE_VISUAL_LABELS[expectedVisualKey] || POSE_PATTERN_LABELS[expected] || "当前动作") +
-              "。",
+              "，" + getPoseEntryInstruction(expected),
             errorIndices: [11, 12, 23, 24, 25, 26],
           };
         }
@@ -1321,7 +1335,7 @@
             tip:
               "我还没对上当前示范动作，请对照" +
               (POSE_VISUAL_LABELS[expectedVisualKey] || POSE_PATTERN_LABELS[expected] || "示范动作") +
-              "重新摆好身体。",
+              "。" + getPoseEntryInstruction(expected),
             errorIndices: [11, 12, 23, 24],
           };
         }
@@ -1343,9 +1357,7 @@
           tip:
             "现在识别到的是" +
             (POSE_PATTERN_LABELS[actual.pattern] || "其他动作") +
-            "，请先回到示范里的" +
-            (POSE_PATTERN_LABELS[expected] || "当前动作") +
-            "。",
+            "，" + getPoseEntryInstruction(expected),
           errorIndices: [11, 12, 23, 24, 25, 26],
         };
       }
@@ -1359,6 +1371,7 @@
             angle: null,
             errorIndices: [],
             label: "等待识别",
+            quality: "no_pose",
           };
         }
 
@@ -1383,6 +1396,7 @@
             errorIndices: [],
             label: `${getCameraModeMeta(cameraModeRequired).short}关键点不足`,
             framing,
+            quality: visibleCount > 0 ? "partial_body" : "no_pose",
           };
         }
 
@@ -1397,6 +1411,8 @@
             label: patternMismatch.label,
             tip: patternMismatch.tip,
             framing,
+            quality: "partial_body",
+            mismatch: patternMismatch,
           };
         }
 
@@ -1775,6 +1791,10 @@
         const [selectedSafety, setSelectedSafety] = useState("none");
         const [transitionPlan, setTransitionPlan] = useState(null);
         const [transitionCount, setTransitionCount] = useState(3);
+        const [onboardingOpen, setOnboardingOpen] = useState(() => {
+          try { return window.localStorage.getItem("yogamind_onboarding_done") !== "1"; } catch (error) { return true; }
+        });
+        const [demoMode, setDemoMode] = useState(false);
         const [practiceStreak, setPracticeStreak] = useState(() => getStoredStreak());
         const [nextPractice, setNextPractice] = useState("下次可以继续做 8 分钟肩颈舒缓，保持今天这种不着急的节奏。");
         const [sessionStats, setSessionStats] = useState({
@@ -1861,6 +1881,7 @@
 
         const startPractice = async () => {
           if (!alignmentReady || loading || startInFlightRef.current) return;
+          setDemoMode(false);
 
           startInFlightRef.current = true;
           setLoadingText(
@@ -1905,6 +1926,18 @@
             setFormError(false);
           }
         };
+
+        const startDemoPractice = () => {
+          if (loading || startInFlightRef.current) return;
+          startInFlightRef.current = true;
+          resetPracticeStats();
+          const localCourse = buildFallbackCourseForPreferences(selectedDuration, selectedFocus, selectedSafety, selectedBodyState);
+          const firstPose = localCourse.poses[0] || FALLBACK_COURSE.poses[0];
+          setDemoMode(true); setCourse(localCourse); setPoseIndex(0); setCurrentPose(firstPose); setSecondsLeft(firstPose.duration_sec || 60);
+          practiceStartedAtRef.current = Date.now(); setFormError(false); setPaused(false); setActiveView("practice"); startInFlightRef.current = false;
+          showOfflineToast("已进入演示模式，不依赖摄像头和后端");
+        };
+        const closeOnboarding = () => { setOnboardingOpen(false); try { window.localStorage.setItem("yogamind_onboarding_done", "1"); } catch (error) {} };
 
         const advancePoseOrFinish = () => {
           const activeCourse = courseRef.current || FALLBACK_COURSE;
@@ -2124,6 +2157,8 @@
                       selectedBodyStateMeta={selectedBodyStateMeta}
                       selectedSafetyMeta={selectedSafetyMeta}
                       onStart={startPractice}
+                      onStartDemo={startDemoPractice}
+                      onOpenGuide={() => setOnboardingOpen(true)}
                     />
                   )}
                   {activeView === "practice" && (
@@ -2143,6 +2178,7 @@
                       courseInsight={courseInsight}
                       errorCounts={errorCounts}
                       hasNextPose={hasNextPose}
+                      demoMode={demoMode}
                       onFormErrorConfirmed={recordFormError}
                       onSummary={advancePoseOrFinish}
                       onExit={backHome}
@@ -2162,6 +2198,7 @@
               </section>
             </div>
 
+            {onboardingOpen && <OnboardingModal onClose={closeOnboarding} />}
             {toast && <Toast message={toast} />}
             {loading && <LoadingOverlay message={loadingText} />}
             {transitionPlan && (
@@ -2203,6 +2240,13 @@
             </section>
           </div>
         );
+      }
+
+      function OnboardingModal({ onClose }) {
+        return (<div className="fixed inset-0 z-40 flex items-end bg-forest/24 px-4 pb-4 pt-10 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"><section className="w-full max-w-md rounded-[30px] border border-white/80 bg-cream p-5 shadow-soft sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-sage">第一次练习前</p><h2 className="mt-2 text-2xl font-semibold leading-tight text-forest">先花 20 秒把体验调舒服</h2></div><button onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-mist text-forest/70 transition active:scale-[0.98]" aria-label="关闭新手引导">×</button></div><div className="mt-5 space-y-3">{ONBOARDING_STEPS.map((step, index) => (<article key={step.title} className="flex gap-3 rounded-[22px] bg-linen p-3.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-night text-sm font-semibold text-lime">{index + 1}</span><div><div className="flex items-center gap-2"><h3 className="text-base font-semibold text-forest">{step.title}</h3><span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-sage">{step.tag}</span></div><p className="mt-1.5 text-sm leading-6 text-forest/64">{step.text}</p></div></article>))}</div><button onClick={onClose} className="mt-5 w-full rounded-[22px] bg-night px-5 py-4 text-base font-semibold text-lime shadow-soft transition active:translate-y-[1px]">我知道了，开始准备</button></section></div>);
+      }
+      function FarReadingHero({ pose, timeLabel, message, trackingQualityMeta, speaking }) {
+        return (<section className="mb-3 rounded-[30px] border border-white/14 bg-white/10 p-4 text-white backdrop-blur-md sm:hidden"><div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-xs font-semibold text-lime/80">远距离大字模式</p><h3 className="mt-1 truncate text-4xl font-semibold leading-none text-white">{pose?.pose_name || "当前动作"}</h3></div><span className="rounded-full bg-lime px-4 py-2 text-2xl font-semibold tabular-nums text-night">{timeLabel}</span></div><p className="mt-4 text-2xl font-semibold leading-snug text-white">{message}</p><div className="mt-4 flex items-center justify-between gap-3 rounded-[22px] bg-night/40 px-3 py-2.5"><span className={["rounded-full px-3 py-1.5 text-xs font-semibold", trackingQualityMeta.tone].join(" ")}>{trackingQualityMeta.label}</span><span className="text-xs font-semibold text-white/62">{speaking ? "正在轻声提醒" : "可主要听语音"}</span></div></section>);
       }
 
       function PoseTransitionOverlay({ pose, countdown }) {
@@ -2522,6 +2566,8 @@
         selectedBodyStateMeta,
         selectedSafetyMeta,
         onStart,
+        onStartDemo,
+        onOpenGuide,
       }) {
         const status = alignmentSteps[step];
         const statusLabel = ready
@@ -2563,6 +2609,8 @@
                     </div>
                   ))}
                 </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center sm:mt-5">{[["本地识别", "视频不上云"], ["定制课表", "按状态安排"], ["温和纠错", "不制造压力"]].map(([title, helper]) => (<div key={title} className="rounded-[18px] bg-white/10 px-2 py-2 backdrop-blur"><p className="text-xs font-semibold text-lime/90">{title}</p><p className="mt-1 truncate text-[11px] text-white/48">{helper}</p></div>))}</div>
 
                 <PracticePreferencePanel
                   selectedFocus={selectedFocus}
@@ -2627,8 +2675,9 @@
                 </div>
               </section>
 
-              <button
-                onClick={onStart}
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <button
+                  onClick={onStart}
                 disabled={!ready || loading}
                 className={[
                   "fixed inset-x-4 bottom-[88px] z-20 flex items-center justify-center gap-2 rounded-[22px] px-6 py-3.5 text-base font-semibold shadow-lifted transition sm:static sm:w-full sm:rounded-2xl sm:py-4",
@@ -2644,7 +2693,11 @@
                   : ready
                     ? `开始 ${selectedDuration} 分钟${selectedFocusMeta.label}`
                     : "等待站位校准"}
-              </button>
+                </button>
+                <button onClick={onStartDemo} className="hidden items-center justify-center gap-2 rounded-2xl border border-night/12 bg-cream px-5 py-4 text-sm font-semibold text-night shadow-sm transition hover:bg-mist active:translate-y-[1px] sm:inline-flex"><Icon type="play" />演示模式</button>
+              </div>
+              <button onClick={onOpenGuide} className="hidden rounded-[22px] border border-white/80 bg-cream/90 px-4 py-3 text-sm font-semibold text-forest/70 shadow-sm transition hover:bg-white active:translate-y-[1px] sm:inline-flex sm:items-center sm:justify-center sm:gap-2"><Icon type="leaf" />查看新手引导</button>
+              <div className="grid grid-cols-2 gap-2 sm:hidden"><button onClick={onStartDemo} className="rounded-[22px] border border-night/12 bg-cream px-4 py-3.5 text-sm font-semibold text-night shadow-lifted transition active:translate-y-[1px]">演示模式</button><button onClick={onOpenGuide} className="rounded-[22px] bg-cream px-4 py-3.5 text-sm font-semibold text-forest/70 shadow-lifted transition active:translate-y-[1px]">引导</button></div>
               <div className="h-20 sm:hidden" aria-hidden="true" />
 
               <div className="hidden rounded-[24px] border border-white/80 bg-cream/86 p-4 text-sm leading-6 text-forest/64 shadow-sm sm:block">
@@ -2681,6 +2734,7 @@
         onFormErrorConfirmed,
         onSummary,
         onExit,
+        demoMode = false,
       }) {
         const videoRef = useRef(null);
         const canvasRef = useRef(null);
@@ -2694,8 +2748,11 @@
         const lastPoseUiUpdateRef = useRef(0);
         const poseHealthRef = useRef({ noPoseSince: null, lastHintAt: 0, lastSendErrorAt: 0 });
         const errorEpisodeReportedRef = useRef(false);
-        const [useMock, setUseMock] = useState(false);
+        const [useMock, setUseMock] = useState(demoMode);
         const [mobileDemoOpen, setMobileDemoOpen] = useState(false);
+        const [readingMode, setReadingMode] = useState("normal");
+        const [trackingQuality, setTrackingQuality] = useState("no_pose");
+        const [poseMismatchState, setPoseMismatchState] = useState(null);
         const [mockSignal, setMockSignal] = useState(false);
         const [cameraState, setCameraState] = useState("idle");
         const [cameraIssue, setCameraIssue] = useState("");
@@ -2728,7 +2785,7 @@
         const cameraRequirement = getCameraModeMeta(
           currentPose?.camera_mode_required || "half_body"
         );
-        const isFarReadingMode = Boolean(poseMeta.framing?.isFar);
+        const isFarReadingMode = readingMode === "far";
         const statusLabel = useMock
           ? "离线体验模式"
           : cameraState === "ready"
@@ -2736,11 +2793,14 @@
             : cameraState === "requesting"
               ? "正在请求摄像头"
               : "准备摄像头";
-        const coachTip = formError
-          ? correctionTip
-          : pendingCorrection
-            ? "我看到身体有一点点晃动，先不用急着调整，跟着呼吸慢下来。"
-            : "吸气时轻轻抬胸，呼气时慢慢拱背。动作小一点也可以。";
+        const coachTip = poseMismatchState?.mismatched
+          ? poseMismatchState.tip
+          : formError
+            ? correctionTip
+            : pendingCorrection
+              ? "我看到身体有一点点晃动，先不用急着调整，跟着呼吸慢下来。"
+              : currentPose?.guidance_tip || "跟着呼吸慢慢来，动作小一点也可以。";
+        const trackingQualityMeta = getTrackingQualityMeta(trackingQuality);
         const angleLabel = Number.isFinite(poseMeta.angle)
           ? `${poseMeta.label} ${poseMeta.angle}°`
           : poseMeta.label;
@@ -2806,9 +2866,8 @@
           speakingRef.current = false;
         };
 
-        useEffect(() => {
-          pausedRef.current = paused;
-        }, [paused]);
+        useEffect(() => { pausedRef.current = paused; }, [paused]);
+        useEffect(() => { if (demoMode) { setUseMock(true); setTrackingQuality("stable"); } }, [demoMode]);
 
         useEffect(() => {
           formErrorRef.current = formError;
@@ -2849,13 +2908,10 @@
 
           if (shouldRefreshUi) {
             lastPoseUiUpdateRef.current = now;
-            setPoseMeta({
-              angle: analysis.angle,
-              visibleCount: analysis.visibleCount,
-              label: analysis.label,
-              tip: analysis.tip || null,
-              framing: analysis.framing || null,
-            });
+            setPoseMeta({ angle: analysis.angle, visibleCount: analysis.visibleCount, label: analysis.label, tip: analysis.tip || null, framing: analysis.framing || null });
+            setTrackingQuality(analysis.quality || (analysis.visibleCount >= 18 ? "stable" : analysis.visibleCount > 0 ? "partial_body" : "no_pose"));
+            setReadingMode(analysis.framing?.isFar ? "far" : "normal");
+            setPoseMismatchState(analysis.mismatch || null);
           }
 
           if (!analysis.hasDeviation || pausedRef.current) {
@@ -3151,6 +3207,7 @@
               </div>
             )}
             <section className="training-card relative overflow-hidden rounded-[28px] p-3.5 text-white shadow-soft sm:rounded-[32px] sm:p-5">
+              {isFarReadingMode && (<FarReadingHero pose={currentPose} timeLabel={timeLabel} message={coachTip} trackingQualityMeta={trackingQualityMeta} speaking={speaking && !muted} />)}
               {cameraIssue && (
                 <div className="mb-4 flex flex-col gap-3 rounded-[24px] border border-clay/25 bg-clay/12 p-4 text-sm text-white/72 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -3214,11 +3271,7 @@
               <CourseInsightCard insight={courseInsight} />
             </div>
 
-            <MobileDemoDock
-              pose={currentPose}
-              expanded={mobileDemoOpen}
-              onToggle={() => setMobileDemoOpen((value) => !value)}
-            />
+            <MobileDemoDock pose={currentPose} expanded={mobileDemoOpen && !isFarReadingMode} compact={isFarReadingMode} onToggle={() => setMobileDemoOpen((value) => !value)} />
 
             <section className="grid gap-3 lg:grid-cols-[minmax(280px,0.4fr)_minmax(0,0.6fr)] lg:gap-4">
               <div className="hidden lg:block">
@@ -3256,9 +3309,8 @@
                   </>
                 )}
 
-                <div className="absolute left-4 top-4 rounded-full border border-white/16 bg-night/58 px-3 py-1.5 text-xs font-semibold text-white/78 shadow-sm backdrop-blur-md">
-                  {statusLabel}
-                </div>
+                <div className="absolute left-4 top-4 rounded-full border border-white/16 bg-night/58 px-3 py-1.5 text-xs font-semibold text-white/78 shadow-sm backdrop-blur-md">{statusLabel}</div>
+                <div className={["absolute left-4 right-4 top-14 max-w-[calc(100%-2rem)] rounded-[18px] px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md sm:right-auto sm:max-w-[360px]", trackingQualityMeta.tone].join(" ")}><span>{trackingQualityMeta.label}</span>{trackingQuality !== "stable" && (<span className="ml-2 font-medium opacity-72">{trackingQualityMeta.helper}</span>)}</div>
 
                 <div className="absolute right-4 top-4 flex max-w-[190px] flex-col items-end gap-2">
                   <button
@@ -3300,35 +3352,25 @@
                   </div>
                 )}
 
-                <div className="absolute left-4 top-14 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md">
-                  {angleLabel}
-                </div>
+                <div className="absolute left-4 top-24 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md">{angleLabel}</div>
                 {cameraIssue && cameraState === "ready" && !useMock && (
-                  <div className="absolute inset-x-4 top-24 rounded-[18px] border border-white/18 bg-white/88 px-4 py-3 text-xs font-semibold leading-relaxed text-forest/76 shadow-sm backdrop-blur-md">
+                  <div className="absolute inset-x-4 top-[136px] rounded-[18px] border border-white/18 bg-white/88 px-4 py-3 text-xs font-semibold leading-relaxed text-forest/76 shadow-sm backdrop-blur-md">
                     {cameraIssue}
                   </div>
                 )}
                 <div
                   className={[
                     "absolute left-4 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md transition-all",
-                    cameraIssue && cameraState === "ready" && !useMock ? "top-[150px]" : "top-24",
+                    cameraIssue && cameraState === "ready" && !useMock ? "top-[206px]" : "top-[136px]",
                   ].join(" ")}
                 >
                   温柔提醒 {Object.values(errorCounts || {}).reduce((sum, value) => sum + value, 0)} 次
                 </div>
 
-                {isFarReadingMode && (
-                  <FarReadingOverlay
-                    poseName={currentPose?.pose_name || "当前动作"}
-                    timeLabel={timeLabel}
-                    message={formError ? correctionTip : "屏幕可以少看一点，听语音，保持呼吸。"}
-                  />
-                )}
-
                 </div>
 
                 <PracticeTipPanel
-                  formError={formError}
+                  formError={formError || Boolean(poseMismatchState?.mismatched)}
                   pendingCorrection={pendingCorrection}
                   coachTip={coachTip}
                   className="hidden sm:block"
@@ -3336,7 +3378,7 @@
 
                 <CoachCompanion
                   speaking={speaking && !muted}
-                  formError={formError}
+                  formError={formError || Boolean(poseMismatchState?.mismatched)}
                   pendingCorrection={pendingCorrection}
                   message={coachTip}
                   frame={voiceFrame}
@@ -3864,7 +3906,7 @@
         );
       }
 
-      function MobileDemoDock({ pose, expanded, onToggle }) {
+      function MobileDemoDock({ pose, expanded, compact = false, onToggle }) {
         const targetMin = pose?.target_angle_min ?? 140;
         const targetMax = pose?.target_angle_max ?? 180;
         const cameraMeta = getCameraModeMeta(pose?.camera_mode_required || "half_body");
@@ -3877,13 +3919,13 @@
           );
 
         return (
-          <section className="rounded-[26px] border border-white/80 bg-cream/92 p-2.5 shadow-sm lg:hidden">
+          <section className={["border border-white/80 bg-cream/92 shadow-sm lg:hidden", compact ? "rounded-[22px] p-2" : "rounded-[26px] p-2.5"].join(" ")}>
             <button
-              onClick={onToggle}
-              className="flex w-full items-center gap-3 text-left transition active:scale-[0.99]"
-              aria-expanded={expanded}
+              onClick={compact ? undefined : onToggle}
+              className={["flex w-full items-center gap-3 text-left transition", compact ? "cursor-default" : "active:scale-[0.99]"].join(" ")}
+              aria-expanded={compact ? false : expanded}
             >
-              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] bg-linen">
+              <div className={compact ? "relative h-14 w-14 shrink-0 overflow-hidden rounded-[18px] bg-linen" : "relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] bg-linen"}>
                 <img
                   src={demoSrc}
                   alt={`${pose?.pose_name || "瑜伽动作"}真人示范图`}
@@ -3903,13 +3945,13 @@
                     {cameraMeta.short}
                   </span>
                 </div>
-                <p className="mt-1 line-clamp-1 text-xs leading-5 text-forest/58">
+                {!compact && (<p className="mt-1 line-clamp-1 text-xs leading-5 text-forest/58">
                   {pose?.key_points_tip || "保持稳定呼吸，动作放慢。"}
-                </p>
+                </p>)}
               </div>
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mist text-sage">
+              {!compact && (<span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mist text-sage">
                 <Icon type={expanded ? "close" : "play"} className="h-4 w-4" />
-              </span>
+              </span>)}
             </button>
 
             {expanded && (
