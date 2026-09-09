@@ -974,6 +974,73 @@
         bridge: "桥式",
         supine_twist: "仰卧扭转",
       };
+      const POSE_VISUAL_LABELS = {
+        standing_breath: "站姿呼吸",
+        cat_cow: "猫牛式",
+        child_pose: "婴儿式",
+        mountain: "山式站立",
+        seated_neck: "坐姿颈侧放松",
+        side_bend: "站姿侧伸展",
+        half_forward_fold: "半前屈伸展",
+        low_lunge: "低弓步",
+        bridge: "桥式预备",
+        supine_twist: "仰卧扭转",
+      };
+
+      const POSE_FEATURE_WEIGHTS = {
+        bodyRatio: 1.05,
+        torsoHorizontal: 1.2,
+        shoulderHipDelta: 1,
+        wristShoulderDelta: 0.85,
+        kneeHipDelta: 0.85,
+        kneeBend: 0.95,
+        sideLean: 0.7,
+        lowerSpread: 0.75,
+        bodyHeight: 0.65,
+      };
+
+      const POSE_FEATURE_TEMPLATES = {
+        standing_breath: {
+          pattern: "standing",
+          features: { bodyRatio: 0.46, torsoHorizontal: 0.08, shoulderHipDelta: -0.35, wristShoulderDelta: 0.27, kneeHipDelta: 0.28, kneeBend: 0.95, sideLean: 0.05, lowerSpread: 0.18, bodyHeight: 0.78 },
+        },
+        mountain: {
+          pattern: "standing",
+          features: { bodyRatio: 0.45, torsoHorizontal: 0.07, shoulderHipDelta: -0.36, wristShoulderDelta: 0.28, kneeHipDelta: 0.28, kneeBend: 0.96, sideLean: 0.05, lowerSpread: 0.18, bodyHeight: 0.78 },
+        },
+        side_bend: {
+          pattern: "side_bend",
+          features: { bodyRatio: 0.53, torsoHorizontal: 0.26, shoulderHipDelta: -0.32, wristShoulderDelta: -0.12, kneeHipDelta: 0.28, kneeBend: 0.95, sideLean: 0.28, lowerSpread: 0.18, bodyHeight: 0.76 },
+        },
+        half_forward_fold: {
+          pattern: "forward_fold",
+          features: { bodyRatio: 0.72, torsoHorizontal: 0.55, shoulderHipDelta: -0.08, wristShoulderDelta: 0.42, kneeHipDelta: 0.28, kneeBend: 0.86, sideLean: 0.2, lowerSpread: 0.16, bodyHeight: 0.68 },
+        },
+        low_lunge: {
+          pattern: "lunge",
+          features: { bodyRatio: 0.9, torsoHorizontal: 0.14, shoulderHipDelta: -0.34, wristShoulderDelta: 0.08, kneeHipDelta: 0.16, kneeBend: 0.58, sideLean: 0.07, lowerSpread: 0.62, bodyHeight: 0.62 },
+        },
+        cat_cow: {
+          pattern: "all_fours",
+          features: { bodyRatio: 1.55, torsoHorizontal: 0.78, shoulderHipDelta: -0.02, wristShoulderDelta: 0.3, kneeHipDelta: 0.18, kneeBend: 0.56, sideLean: 0.12, lowerSpread: 0.44, bodyHeight: 0.45 },
+        },
+        child_pose: {
+          pattern: "mat_fold",
+          features: { bodyRatio: 1.75, torsoHorizontal: 0.86, shoulderHipDelta: -0.02, wristShoulderDelta: 0.05, kneeHipDelta: 0.08, kneeBend: 0.34, sideLean: 0.18, lowerSpread: 0.45, bodyHeight: 0.34 },
+        },
+        seated_neck: {
+          pattern: "seated",
+          features: { bodyRatio: 0.9, torsoHorizontal: 0.14, shoulderHipDelta: -0.3, wristShoulderDelta: 0.16, kneeHipDelta: 0.02, kneeBend: 0.28, sideLean: 0.18, lowerSpread: 0.52, bodyHeight: 0.55 },
+        },
+        bridge: {
+          pattern: "bridge",
+          features: { bodyRatio: 1.7, torsoHorizontal: 0.82, shoulderHipDelta: 0.08, wristShoulderDelta: 0.06, kneeHipDelta: 0.08, kneeBend: 0.5, sideLean: 0.12, lowerSpread: 0.48, bodyHeight: 0.34 },
+        },
+        supine_twist: {
+          pattern: "supine_twist",
+          features: { bodyRatio: 1.95, torsoHorizontal: 0.88, shoulderHipDelta: 0.02, wristShoulderDelta: 0.02, kneeHipDelta: -0.04, kneeBend: 0.42, sideLean: 0.22, lowerSpread: 0.65, bodyHeight: 0.32 },
+        },
+      };
 
       function calculateAngle(pointA, pointB, pointC) {
         if (!pointA || !pointB || !pointC) return null;
@@ -1016,6 +1083,117 @@
           supine_twist: "supine_twist",
         };
         return patternMap[visualKey] || "standing";
+      }
+
+
+      function clamp01(value) {
+        if (!Number.isFinite(value)) return 0;
+        return Math.max(0, Math.min(1, value));
+      }
+
+      function distance2D(pointA, pointB) {
+        if (!pointA || !pointB) return null;
+        const dx = pointA.x - pointB.x;
+        const dy = pointA.y - pointB.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      function extractPoseFeatureVector(landmarks) {
+        const bodyPoints = Array.from(BODY_KEYPOINT_INDICES)
+          .map((index) => landmarks[index])
+          .filter(isReliableLandmark);
+        if (bodyPoints.length < 8) return null;
+
+        const minX = Math.min(...bodyPoints.map((point) => point.x));
+        const maxX = Math.max(...bodyPoints.map((point) => point.x));
+        const minY = Math.min(...bodyPoints.map((point) => point.y));
+        const maxY = Math.max(...bodyPoints.map((point) => point.y));
+        const bodyWidth = Math.max(0.01, maxX - minX);
+        const bodyHeight = Math.max(0.01, maxY - minY);
+        const shoulder = getPointCenter(landmarks[11], landmarks[12]);
+        const hip = getPointCenter(landmarks[23], landmarks[24]);
+        const knee = getPointCenter(landmarks[25], landmarks[26]);
+        const ankle = getPointCenter(landmarks[27], landmarks[28], landmarks[31], landmarks[32]);
+        const wrist = getPointCenter(landmarks[15], landmarks[16]);
+        const head = getPointCenter(landmarks[0], landmarks[7], landmarks[8]);
+        if (!shoulder || !hip) return null;
+
+        const torsoDx = Math.abs(shoulder.x - hip.x);
+        const torsoDy = Math.abs(shoulder.y - hip.y);
+        const torsoHorizontal = torsoDx / Math.max(0.01, torsoDx + torsoDy);
+        const shoulderHipDelta = (shoulder.y - hip.y) / bodyHeight;
+        const wristShoulderDelta = wrist ? (wrist.y - shoulder.y) / bodyHeight : 0;
+        const kneeHipDelta = knee ? (knee.y - hip.y) / bodyHeight : 0;
+        const rightKneeAngle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+        const leftKneeAngle = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+        const kneeAngles = [rightKneeAngle, leftKneeAngle].filter(Number.isFinite);
+        const kneeBend = kneeAngles.length
+          ? kneeAngles.reduce((sum, angle) => sum + angle, 0) / kneeAngles.length / 180
+          : 0.72;
+        const sideLean = head ? Math.abs(head.x - hip.x) / bodyWidth : 0;
+        const lowerSpread = ankle && knee ? distance2D(ankle, knee) / bodyWidth : 0;
+
+        return {
+          bodyRatio: clamp01(bodyWidth / Math.max(0.01, bodyHeight) / 2.2),
+          torsoHorizontal: clamp01(torsoHorizontal),
+          shoulderHipDelta: clamp01((shoulderHipDelta + 0.5) / 1.0),
+          wristShoulderDelta: clamp01((wristShoulderDelta + 0.2) / 0.9),
+          kneeHipDelta: clamp01((kneeHipDelta + 0.15) / 0.65),
+          kneeBend: clamp01(kneeBend),
+          sideLean: clamp01(sideLean / 0.7),
+          lowerSpread: clamp01(lowerSpread / 1.0),
+          bodyHeight: clamp01(bodyHeight / 0.9),
+        };
+      }
+
+      function normalizeTemplateFeatures(features) {
+        return {
+          bodyRatio: clamp01((features.bodyRatio || 0) / 2.2),
+          torsoHorizontal: clamp01(features.torsoHorizontal || 0),
+          shoulderHipDelta: clamp01(((features.shoulderHipDelta || 0) + 0.5) / 1.0),
+          wristShoulderDelta: clamp01(((features.wristShoulderDelta || 0) + 0.2) / 0.9),
+          kneeHipDelta: clamp01(((features.kneeHipDelta || 0) + 0.15) / 0.65),
+          kneeBend: clamp01(features.kneeBend || 0),
+          sideLean: clamp01((features.sideLean || 0) / 0.7),
+          lowerSpread: clamp01(features.lowerSpread || 0),
+          bodyHeight: clamp01((features.bodyHeight || 0) / 0.9),
+        };
+      }
+
+      function comparePoseFeatureVectors(currentFeatures, templateFeatures) {
+        if (!currentFeatures || !templateFeatures) return 0;
+        const normalizedTemplate = normalizeTemplateFeatures(templateFeatures);
+        let weightedDistance = 0;
+        let totalWeight = 0;
+        Object.entries(POSE_FEATURE_WEIGHTS).forEach(([key, weight]) => {
+          const delta = Math.abs((currentFeatures[key] ?? 0) - (normalizedTemplate[key] ?? 0));
+          weightedDistance += delta * weight;
+          totalWeight += weight;
+        });
+        const meanDistance = weightedDistance / Math.max(0.001, totalWeight);
+        return Math.round(clamp01(1 - meanDistance) * 100) / 100;
+      }
+
+      function classifyPoseWithTemplates(landmarks) {
+        const features = extractPoseFeatureVector(landmarks);
+        if (!features) {
+          return { key: "unknown", pattern: "unknown", score: 0, scores: {}, features: null };
+        }
+
+        const scores = Object.fromEntries(
+          Object.entries(POSE_FEATURE_TEMPLATES).map(([key, template]) => [
+            key,
+            comparePoseFeatureVectors(features, template.features),
+          ])
+        );
+        const [key, score] = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+        return {
+          key,
+          pattern: POSE_FEATURE_TEMPLATES[key]?.pattern || "unknown",
+          score,
+          scores,
+          features,
+        };
       }
 
       function classifyPosePattern(landmarks) {
@@ -1093,9 +1271,48 @@
 
       function evaluatePosePatternMismatch(landmarks, poseConfig = {}) {
         const expected = getExpectedPosePattern(poseConfig);
+        const expectedVisualKey =
+          poseConfig.demo_visual_key ||
+          inferDemoVisualKey(poseConfig.pose_name, poseConfig.pose_id);
+        const templateMatch = classifyPoseWithTemplates(landmarks);
+        const templateScore = templateMatch.scores?.[expectedVisualKey] || 0;
+        const bestTemplateIsDifferent =
+          templateMatch.key !== "unknown" &&
+          templateMatch.key !== expectedVisualKey &&
+          templateMatch.score >= 0.64 &&
+          templateScore < 0.58 &&
+          templateMatch.score - templateScore >= 0.08;
+
+        if (bestTemplateIsDifferent) {
+          return {
+            mismatched: true,
+            expected,
+            actual: { pattern: templateMatch.pattern, confidence: templateMatch.score },
+            label: "动作匹配度低",
+            tip:
+              "现在更像" +
+              (POSE_VISUAL_LABELS[templateMatch.key] || POSE_PATTERN_LABELS[templateMatch.pattern] || "其他动作") +
+              "，请先回到示范里的" +
+              (POSE_VISUAL_LABELS[expectedVisualKey] || POSE_PATTERN_LABELS[expected] || "当前动作") +
+              "。",
+            errorIndices: [11, 12, 23, 24, 25, 26],
+          };
+        }
+
         const actual = classifyPosePattern(landmarks);
         if (actual.pattern === "unknown" || actual.confidence < 0.62) {
-          return { mismatched: false, expected, actual };
+          const isExpectedTemplateTooLow = templateScore > 0 && templateScore < 0.5;
+          return {
+            mismatched: isExpectedTemplateTooLow,
+            expected,
+            actual,
+            label: "动作匹配度低",
+            tip:
+              "我还没对上当前示范动作，请对照" +
+              (POSE_VISUAL_LABELS[expectedVisualKey] || POSE_PATTERN_LABELS[expected] || "示范动作") +
+              "重新摆好身体。",
+            errorIndices: [11, 12, 23, 24],
+          };
         }
 
         const compatible = {
@@ -1112,7 +1329,12 @@
           expected,
           actual,
           label: "动作不匹配",
-          tip: "现在识别到的是" + (POSE_PATTERN_LABELS[actual.pattern] || "其他动作") + "，请先回到示范里的" + (POSE_PATTERN_LABELS[expected] || "当前动作") + "。",
+          tip:
+            "现在识别到的是" +
+            (POSE_PATTERN_LABELS[actual.pattern] || "其他动作") +
+            "，请先回到示范里的" +
+            (POSE_PATTERN_LABELS[expected] || "当前动作") +
+            "。",
           errorIndices: [11, 12, 23, 24, 25, 26],
         };
       }
