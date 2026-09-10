@@ -1,0 +1,4328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#F6FAFF" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>灵瑜 AI | YogaMind AI</title>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              linen: "#F6FAFF",
+              sage: "#7F94F6",
+              forest: "#27324A",
+              mist: "#EEF3FF",
+              shell: "#FBFDFF",
+              clay: "#F39A72",
+              sand: "#DCE6F8",
+              cream: "#FFFFFF",
+              night: "#5368D8",
+              lime: "#FFFFFF",
+            },
+            boxShadow: {
+              soft: "0 22px 54px rgba(93, 112, 191, 0.12), 0 8px 22px rgba(125, 211, 198, 0.10)",
+              lifted: "0 18px 42px rgba(93, 112, 191, 0.16)",
+              inset: "inset 0 1px 0 rgba(255,255,255,0.85)",
+            },
+            fontFamily: {
+              app: [
+                "ui-rounded",
+                "SF Pro Rounded",
+                "Avenir Next",
+                "PingFang SC",
+                "Microsoft YaHei",
+                "system-ui",
+                "sans-serif",
+              ],
+            },
+            keyframes: {
+              breathe: {
+                "0%, 100%": { transform: "scale(1)", opacity: "0.68" },
+                "50%": { transform: "scale(1.032)", opacity: "1" },
+              },
+              float: {
+                "0%, 100%": { transform: "translate3d(0, 0, 0)" },
+                "50%": { transform: "translate3d(0, -7px, 0)" },
+              },
+              wave: {
+                "0%, 100%": { transform: "scaleY(0.34)" },
+                "50%": { transform: "scaleY(1)" },
+              },
+              settle: {
+                "0%": { opacity: "0", transform: "translateY(12px) scale(0.98)" },
+                "100%": { opacity: "1", transform: "translateY(0) scale(1)" },
+              },
+              coachPulse: {
+                "0%, 100%": {
+                  boxShadow:
+                    "0 18px 44px rgba(39, 50, 74, 0.10), 0 0 0 0 rgba(243, 154, 114, 0.16)",
+                },
+                "50%": {
+                  boxShadow:
+                    "0 18px 44px rgba(39, 50, 74, 0.10), 0 0 0 8px rgba(243, 154, 114, 0.08)",
+                },
+              },
+            },
+            animation: {
+              breathe: "breathe 4.2s ease-in-out infinite",
+              float: "float 5.5s ease-in-out infinite",
+              wave: "wave 1.08s ease-in-out infinite",
+              settle: "settle 520ms cubic-bezier(0.16, 1, 0.3, 1) both",
+              coachPulse: "coachPulse 1.8s ease-in-out infinite",
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        -webkit-tap-highlight-color: rgba(106, 196, 190, 0.18);
+        font-family: ui-rounded, "SF Pro Rounded", "Avenir Next", "PingFang SC",
+          "Microsoft YaHei", system-ui, sans-serif;
+        background:
+          radial-gradient(circle at 12% 0%, rgba(143, 166, 255, 0.22), transparent 34%),
+          radial-gradient(circle at 88% 10%, rgba(125, 211, 198, 0.20), transparent 32%),
+          linear-gradient(180deg, #f6faff 0%, #fbfdff 48%, #eef5ff 100%);
+      }
+
+      .linen-texture::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.28;
+        background-image:
+          linear-gradient(rgba(39, 50, 74, 0.018) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(39, 50, 74, 0.012) 1px, transparent 1px);
+        background-size: 32px 32px, 32px 32px;
+        mask-image: linear-gradient(to bottom, black, transparent 84%);
+      }
+
+      .camera-surface {
+        background:
+          linear-gradient(155deg, rgba(42, 56, 104, 0.96) 0%, rgba(83, 104, 216, 0.9) 46%, rgba(226, 247, 247, 0.86) 100%);
+      }
+
+      .training-card {
+        background:
+          linear-gradient(145deg, rgba(125, 148, 246, 0.96), rgba(105, 196, 190, 0.88));
+      }
+
+      .sport-stripe {
+        background:
+          linear-gradient(120deg, transparent 0 18%, rgba(255, 241, 184, 0.38) 18% 24%, transparent 24% 100%);
+      }
+
+      .mat-perspective {
+        clip-path: polygon(30% 0, 70% 0, 88% 100%, 12% 100%);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          scroll-behavior: auto !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body class="linen-texture bg-linen text-forest">
+    <div id="root">
+      <div style="min-height:100vh;background:#F6FAFF;color:#27324A;font-family:'PingFang SC','Microsoft YaHei',system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;">
+        <div style="max-width:520px;background:#FFFFFF;border-radius:28px;padding:28px;box-shadow:0 20px 54px rgba(17,26,21,0.08),0 8px 20px rgba(24,182,106,0.08);">
+          <div style="width:48px;height:48px;border-radius:18px;background:#5368D8;color:#FFFFFF;display:flex;align-items:center;justify-content:center;margin-bottom:18px;font-weight:700;">瑜</div>
+          <h1 style="font-size:28px;line-height:1.15;margin:0 0 12px;">灵瑜 AI</h1>
+          <p style="font-size:16px;line-height:1.7;margin:0;color:rgba(17,26,21,0.72);">页面正在加载。如果这里一直不变化，通常是网络没有加载成功。可以用浏览器直接打开本文件，或让我启动本地预览服务。</p>
+        </div>
+      </div>
+    </div>
+
+    <script type="text/babel">
+      const { useEffect, useMemo, useRef, useState } = React;
+
+      const views = [
+        { id: "align", label: "准备" },
+        { id: "practice", label: "练习" },
+        { id: "summary", label: "回顾" },
+      ];
+
+      const CV_FRAME_INTERVAL_MS = 250;
+      const POSE_DEBOUNCE_MS = 1500;
+      const TTS_THROTTLE_MS = 10000;
+      const FETCH_TIMEOUT_MS = 5000;
+      function getApiBaseUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const manualApi = params.get("api");
+        if (manualApi) {
+          if (manualApi.toLowerCase() === "offline") return "offline";
+          return manualApi.replace(/\/$/, "");
+        }
+
+        if (window.location.protocol === "file:" || !window.location.hostname) {
+          return "http://127.0.0.1:8000";
+        }
+
+        const localHostPattern = /^(localhost|127\.0\.0\.1|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)$/;
+        if (localHostPattern.test(window.location.hostname)) {
+          return `${window.location.protocol}//${window.location.hostname}:8000`;
+        }
+
+        return "offline";
+      }
+
+      const API_BASE_URL = getApiBaseUrl();
+      const DEBUG_MODE = new URLSearchParams(window.location.search).get("debug") === "1";
+      const ONBOARDING_STEPS = [
+        { title: "先把手机放稳", text: "把手机斜靠在杯子或支架上，镜头朝向瑜伽垫。站远一点也没关系，练习时我会放大关键提示。", tag: "手机摆放" },
+        { title: "先看示范，再跟着做", text: "每个动作开始前会先给你看标准示范。动作不用做到很大，只要舒服、稳定、能呼吸就很好。", tag: "动作理解" },
+        { title: "练习时主要听提醒", text: "如果你离屏幕比较远，我会自动切到大字模式。语音会低频提醒，不会一直打断你。", tag: "轻声陪练" },
+      ];
+      const TRACKING_QUALITY_META = {
+        stable: { label: "识别稳定", helper: "身体线条清楚，可以继续保持。", tone: "bg-lime text-night" },
+        partial_body: { label: "关键点不足", helper: "请让头部、肩膀和髋部尽量入镜。", tone: "bg-white/88 text-forest" },
+        low_light: { label: "光线偏暗", helper: "打开一盏灯，或让身体面对更亮的位置。", tone: "bg-[#FFF3EB] text-clay" },
+        no_pose: { label: "等待入镜", helper: "请后退一点，让头部和肩膀进入画面。", tone: "bg-white/88 text-forest" },
+      };
+      const POSE_ENTRY_INSTRUCTIONS = {
+        standing: "先站到垫子中央，双脚踩稳，让头顶和肩膀进入画面。", all_fours: "先回到垫面四足跪姿，双手撑地，膝盖落在髋部下方。", mat_fold: "先跪坐到垫子上，身体向前放松，额头靠近垫面。", seated: "先坐稳，背部轻轻立起来，肩膀自然下沉。", side_bend: "先站稳，再把一侧手臂向上伸展，身体轻轻侧弯。", forward_fold: "先双脚站稳，膝盖微弯，背部向前拉长。", lunge: "先把一只脚向前迈大步，前膝对准脚尖，身体保持稳定。", bridge: "先仰卧屈膝，双脚踩地，再慢慢抬起骨盆。", supine_twist: "先仰卧到垫子上，肩膀放松，再让膝盖慢慢倒向一侧。", unknown: "先对照示范，把身体摆到相同的起始姿势。",
+      };
+      function getPoseEntryInstruction(pattern) { return POSE_ENTRY_INSTRUCTIONS[pattern] || POSE_ENTRY_INSTRUCTIONS.unknown; }
+      function getTrackingQualityMeta(quality) { return TRACKING_QUALITY_META[quality] || TRACKING_QUALITY_META.no_pose; }
+      const DEMO_PLACEHOLDER_SVG =
+        "data:image/svg+xml;charset=UTF-8," +
+        encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1100">
+            <defs>
+              <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+                <stop offset="0" stop-color="#FFFFFF"/>
+                <stop offset="0.62" stop-color="#F7F8F2"/>
+                <stop offset="1" stop-color="#EAF8F7"/>
+              </linearGradient>
+            </defs>
+            <rect width="900" height="1100" fill="url(#bg)"/>
+            <ellipse cx="450" cy="860" rx="250" ry="42" fill="#6AC4BE" opacity=".1"/>
+            <circle cx="450" cy="250" r="66" fill="#6AC4BE" opacity=".22"/>
+            <path d="M450 330 C410 430 390 560 342 690 M450 330 C505 425 560 540 620 690 M394 430 C300 480 250 560 218 650 M506 430 C608 478 660 560 690 650" fill="none" stroke="#6AC4BE" stroke-width="38" stroke-linecap="round" opacity=".56"/>
+            <path d="M300 790 C380 740 520 740 600 790" fill="none" stroke="#F39A72" stroke-width="22" stroke-linecap="round" opacity=".35"/>
+            <text x="450" y="990" text-anchor="middle" font-size="42" font-family="Microsoft YaHei, sans-serif" fill="#27324A" opacity=".72">真人示范加载中</text>
+          </svg>
+        `);
+
+      const DEMO_ASSET_URLS = {
+        standing_breath: "assets/demo/standing_breath.png",
+        cat_cow: "assets/demo/cat_cow.png",
+        child_pose: "assets/demo/child_pose.png",
+        mountain: "assets/demo/mountain.png",
+        seated_neck: "assets/demo/seated_neck.png",
+        side_bend: "assets/demo/side_bend.png",
+        half_forward_fold: "assets/demo/half_forward_fold.png",
+        low_lunge: "assets/demo/low_lunge.png",
+        bridge: "assets/demo/bridge.png",
+        supine_twist: "assets/demo/supine_twist.png",
+      };
+
+      function getDemoAssetUrl(visualKey, poseName = "", poseId = "") {
+        const resolvedKey = visualKey || inferDemoVisualKey(poseName, poseId);
+        return DEMO_ASSET_URLS[resolvedKey] || DEMO_ASSET_URLS.standing_breath;
+      }
+
+      const FALLBACK_COURSE = {
+        course_id: "course_local_fallback",
+        course_title: "10分钟肩颈舒缓放松跟练",
+        total_duration_sec: 600,
+        plan_reason:
+          "根据你的肩颈舒缓目标和当前身体状态，今天先从呼吸、肩颈放松和脊柱唤醒开始，节奏更慢、更适合新手。",
+        poses: [
+          {
+            pose_id: "breathing_center",
+            pose_name: "站姿呼吸",
+            duration_sec: 60,
+            cv_rule_key: "shoulder_relax",
+            correction_error_key: "shoulder_high",
+            camera_mode_required: "half_body",
+            demo_visual_key: "standing_breath",
+            demo_media_url: getDemoAssetUrl("standing_breath"),
+            key_points_tip: "双脚踩稳，锁骨轻轻展开，肩膀自然远离耳朵。",
+            target_angle_min: 150,
+            target_angle_max: 180,
+            guidance_tip: "双脚踩稳，肩膀自然下沉，先找到平稳呼吸。",
+            focus_tags: ["shoulder", "spine", "full_body"],
+            avoid_for: [],
+          },
+          {
+            pose_id: "cat_cow",
+            pose_name: "猫牛式",
+            duration_sec: 60,
+            cv_rule_key: "spine_extension",
+            correction_error_key: "spine_rounding",
+            camera_mode_required: "half_body",
+            demo_visual_key: "cat_cow",
+            demo_media_url: getDemoAssetUrl("cat_cow"),
+            key_points_tip: "保持沉肩，双手稳定推地，跟随呼吸缓慢卷动脊柱。",
+            target_angle_min: 140,
+            target_angle_max: 180,
+            guidance_tip: "注意跟随呼吸，缓慢下沉脊柱并沉肩。",
+            focus_tags: ["shoulder", "spine", "full_body"],
+            avoid_for: ["knee"],
+          },
+          {
+            pose_id: "child_pose",
+            pose_name: "婴儿式",
+            duration_sec: 60,
+            cv_rule_key: "spine_extension",
+            correction_error_key: "shoulder_high",
+            camera_mode_required: "mat_view",
+            demo_visual_key: "child_pose",
+            demo_media_url: getDemoAssetUrl("child_pose"),
+            key_points_tip: "臀部向脚跟放松，手臂向前延展，后背保持柔和拉长。",
+            target_angle_min: 120,
+            target_angle_max: 175,
+            guidance_tip: "额头轻轻靠近垫面，让背部自然展开。",
+            focus_tags: ["shoulder", "spine", "full_body"],
+            avoid_for: ["knee"],
+          },
+          {
+            pose_id: "mountain_pose",
+            pose_name: "山式站立",
+            duration_sec: 60,
+            cv_rule_key: "shoulder_relax",
+            correction_error_key: "shoulder_high",
+            camera_mode_required: "full_body",
+            demo_visual_key: "mountain",
+            demo_media_url: getDemoAssetUrl("mountain"),
+            key_points_tip: "脚掌均匀踩地，头顶向上延展，肩膀自然下沉。",
+            target_angle_min: 150,
+            target_angle_max: 180,
+            guidance_tip: "站稳后把呼吸放慢，肩膀自然远离耳朵。",
+            focus_tags: ["shoulder", "spine", "full_body"],
+            avoid_for: [],
+          },
+          {
+            pose_id: "seated_neck_release",
+            pose_name: "坐姿颈侧放松",
+            duration_sec: 60,
+            cv_rule_key: "shoulder_relax",
+            correction_error_key: "shoulder_high",
+            camera_mode_required: "half_body",
+            demo_visual_key: "seated_neck",
+            demo_media_url: getDemoAssetUrl("seated_neck"),
+            key_points_tip: "坐骨稳定，肩膀下沉，颈部只做轻柔延展。",
+            target_angle_min: 150,
+            target_angle_max: 180,
+            guidance_tip: "先沉肩，再让颈侧轻轻拉长，不要用力压头。",
+            focus_tags: ["shoulder"],
+            avoid_for: ["neck"],
+          },
+          {
+            pose_id: "standing_side_bend",
+            pose_name: "站姿侧伸展",
+            duration_sec: 60,
+            cv_rule_key: "spine_extension",
+            correction_error_key: "spine_rounding",
+            camera_mode_required: "full_body",
+            demo_visual_key: "side_bend",
+            demo_media_url: getDemoAssetUrl("side_bend"),
+            key_points_tip: "骨盆保持稳定，侧腰向上拉长，身体不要向前塌。",
+            target_angle_min: 135,
+            target_angle_max: 180,
+            guidance_tip: "侧腰慢慢拉长，动作停在舒服的位置。",
+            focus_tags: ["spine", "full_body"],
+            avoid_for: ["waist"],
+          },
+          {
+            pose_id: "half_forward_fold",
+            pose_name: "半前屈伸展",
+            duration_sec: 60,
+            cv_rule_key: "spine_extension",
+            correction_error_key: "spine_rounding",
+            camera_mode_required: "full_body",
+            demo_visual_key: "half_forward_fold",
+            demo_media_url: getDemoAssetUrl("half_forward_fold"),
+            key_points_tip: "膝盖可以微屈，背部向前拉长，不追求手碰地。",
+            target_angle_min: 135,
+            target_angle_max: 180,
+            guidance_tip: "背部拉长一点就好，膝盖可以保持微弯。",
+            focus_tags: ["spine", "full_body"],
+            avoid_for: ["waist"],
+          },
+          {
+            pose_id: "low_lunge",
+            pose_name: "低弓步",
+            duration_sec: 60,
+            cv_rule_key: "knee_alignment",
+            correction_error_key: "knee_inward",
+            camera_mode_required: "full_body",
+            demo_visual_key: "low_lunge",
+            demo_media_url: getDemoAssetUrl("low_lunge"),
+            key_points_tip: "前膝对准脚尖，后脚外缘踩稳，双肩下沉。",
+            target_angle_min: 140,
+            target_angle_max: 180,
+            guidance_tip: "前膝对准脚尖，胸口轻轻向前打开。",
+            focus_tags: ["full_body"],
+            avoid_for: ["knee", "waist"],
+          },
+          {
+            pose_id: "bridge_prep",
+            pose_name: "桥式预备",
+            duration_sec: 60,
+            cv_rule_key: "hip_stability",
+            correction_error_key: "hip_shift",
+            camera_mode_required: "mat_view",
+            demo_visual_key: "bridge",
+            demo_media_url: getDemoAssetUrl("bridge"),
+            key_points_tip: "双脚踩稳，骨盆缓慢抬起，保持左右髋部稳定。",
+            target_angle_min: 130,
+            target_angle_max: 180,
+            guidance_tip: "脚掌踩稳，骨盆慢慢抬起，腰背不要硬顶。",
+            focus_tags: ["spine", "full_body"],
+            avoid_for: ["waist", "neck"],
+          },
+          {
+            pose_id: "supine_twist",
+            pose_name: "仰卧扭转",
+            duration_sec: 60,
+            cv_rule_key: "hip_stability",
+            correction_error_key: "hip_shift",
+            camera_mode_required: "mat_view",
+            demo_visual_key: "supine_twist",
+            demo_media_url: getDemoAssetUrl("supine_twist"),
+            key_points_tip: "肩膀尽量贴近地面，骨盆保持稳定，扭转停在舒服的位置。",
+            target_angle_min: 130,
+            target_angle_max: 180,
+            guidance_tip: "让肩膀贴近地面，动作停在舒服的位置。",
+            focus_tags: ["spine", "full_body"],
+            avoid_for: ["waist"],
+          },
+        ],
+      };
+
+      const FALLBACK_SESSION_SUMMARY = {
+        session_id: "sess_local_fallback",
+        summary_title: "很好，你完成了一次稳定的练习",
+        ai_feedback:
+          "今天你完成了完整跟练，整体节奏很稳。下次继续保持沉肩呼吸，把动作幅度放小一点，让身体慢慢进入状态。",
+        badge_awarded: "肩颈舒缓小能手",
+        next_practice_suggestion:
+          "下次可以继续做 8 分钟肩颈舒缓，保持今天这种不着急的节奏。",
+      };
+
+      const FOCUS_OPTIONS = [
+        {
+          id: "shoulder",
+          label: "肩颈舒缓",
+          helper: "适合久坐、低头后放松",
+          requestText: "肩颈状态",
+        },
+        {
+          id: "spine",
+          label: "脊柱唤醒",
+          helper: "适合腰背僵、早晚拉伸",
+          requestText: "脊柱灵活度",
+        },
+        {
+          id: "full_body",
+          label: "全身轻练",
+          helper: "适合想温和活动一下",
+          requestText: "全身活动需求",
+        },
+      ];
+
+      const BODY_STATE_OPTIONS = [
+        { id: "stiff", label: "有点僵", helper: "动作放慢一点" },
+        { id: "tired", label: "有点累", helper: "强度再轻一点" },
+        { id: "normal", label: "状态还行", helper: "保持稳定节奏" },
+      ];
+
+      const SAFETY_OPTIONS = [
+        { id: "none", label: "无明显不适", helper: "标准新手课" },
+        { id: "knee", label: "膝盖不适", helper: "避开深蹲跪压" },
+        { id: "waist", label: "腰背不适", helper: "减少后弯扭转" },
+        { id: "neck", label: "肩颈紧张", helper: "优先沉肩放松" },
+      ];
+
+      const DURATION_OPTIONS = [5, 10, 15];
+
+      function getOptionById(options, id) {
+        return options.find((option) => option.id === id) || options[0];
+      }
+
+      function escapeSvgText(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function inferDemoVisualKey(poseName = "", poseId = "") {
+        const text = `${poseId} ${poseName}`.toLowerCase();
+        if (text.includes("cat") || text.includes("猫牛")) return "cat_cow";
+        if (text.includes("child") || text.includes("婴儿")) return "child_pose";
+        if (text.includes("mountain") || text.includes("山式")) return "mountain";
+        if (text.includes("neck") || text.includes("颈")) return "seated_neck";
+        if (text.includes("side") || text.includes("侧伸")) return "side_bend";
+        if (text.includes("forward") || text.includes("前屈")) return "half_forward_fold";
+        if (text.includes("lunge") || text.includes("弓步")) return "low_lunge";
+        if (text.includes("bridge") || text.includes("桥式")) return "bridge";
+        if (text.includes("twist") || text.includes("扭转")) return "supine_twist";
+        return "standing_breath";
+      }
+
+      function createPoseDemoPlaceholder(
+        poseName = "标准示范",
+        tip = "动作放慢，保持自然呼吸。",
+        visualKey = "standing_breath"
+      ) {
+        const safePoseName = escapeSvgText(String(poseName).slice(0, 16));
+        const safeTip = escapeSvgText(String(tip).slice(0, 28));
+        const scenes = {
+          standing_breath: {
+            hint: "肩膀放松",
+            head: [450, 246, 54],
+            torso: '<path d="M450 322 C440 430 440 540 450 640"/>',
+            arms: '<path d="M402 392 C350 464 320 545 300 632"/><path d="M498 392 C550 464 580 545 600 632"/>',
+            legs: '<path d="M450 640 L390 824"/><path d="M450 640 L510 824"/>',
+            guide: '<path d="M316 340 C292 400 292 466 316 526"/><path d="M584 340 C608 400 608 466 584 526"/>',
+            joints: [[450, 322], [402, 392], [498, 392], [450, 640], [390, 824], [510, 824]],
+          },
+          cat_cow: {
+            hint: "脊柱卷动",
+            head: [666, 428, 48],
+            torso: '<path d="M254 548 C378 432 532 430 650 544"/>',
+            arms: '<path d="M300 548 L260 750"/><path d="M612 542 L662 750"/>',
+            legs: '<path d="M390 484 L358 750"/><path d="M522 488 L502 750"/>',
+            guide: '<path d="M294 500 C408 390 536 394 632 500"/>',
+            joints: [[254, 548], [390, 484], [522, 488], [650, 544], [260, 750], [662, 750], [358, 750], [502, 750]],
+          },
+          child_pose: {
+            hint: "背部拉长",
+            head: [672, 628, 48],
+            torso: '<path d="M250 638 C372 534 526 558 672 628"/>',
+            arms: '<path d="M540 620 C642 668 724 666 792 636"/><path d="M506 650 C614 706 706 710 778 682"/>',
+            legs: '<path d="M260 648 C282 744 406 774 526 724"/><path d="M338 672 C430 712 526 698 600 650"/>',
+            guide: '<path d="M252 578 C398 488 552 520 696 594"/>',
+            joints: [[250, 638], [526, 724], [672, 628], [792, 636], [778, 682], [338, 672]],
+          },
+          mountain: {
+            hint: "头顶向上",
+            head: [450, 224, 54],
+            torso: '<path d="M450 306 C450 420 450 528 450 642"/>',
+            arms: '<path d="M402 372 C358 454 334 540 326 642"/><path d="M498 372 C542 454 566 540 574 642"/>',
+            legs: '<path d="M450 642 L392 824"/><path d="M450 642 L508 824"/>',
+            guide: '<path d="M450 150 L450 810"/><path d="M374 318 L526 318"/>',
+            joints: [[450, 306], [402, 372], [498, 372], [450, 642], [392, 824], [508, 824]],
+          },
+          seated_neck: {
+            hint: "颈侧轻拉",
+            head: [520, 282, 54],
+            torso: '<path d="M448 382 C426 490 430 572 456 650"/>',
+            arms: '<path d="M420 438 C356 480 314 528 286 592"/><path d="M476 438 C542 482 582 532 610 594"/>',
+            legs: '<path d="M456 650 C350 704 292 748 230 790"/><path d="M456 650 C570 704 646 748 710 790"/>',
+            guide: '<path d="M520 340 C492 372 466 396 432 414"/>',
+            joints: [[520, 282], [448, 382], [420, 438], [476, 438], [456, 650], [230, 790], [710, 790]],
+          },
+          side_bend: {
+            hint: "侧腰延展",
+            head: [540, 248, 54],
+            torso: '<path d="M474 326 C530 430 536 538 502 650"/>',
+            arms: '<path d="M468 360 C400 300 356 238 334 170"/><path d="M492 366 C572 360 626 398 666 456"/>',
+            legs: '<path d="M502 650 L412 824"/><path d="M502 650 L568 824"/>',
+            guide: '<path d="M340 178 C414 270 482 382 520 560"/>',
+            joints: [[540, 248], [474, 326], [468, 360], [492, 366], [502, 650], [334, 170], [666, 456], [412, 824], [568, 824]],
+          },
+          half_forward_fold: {
+            hint: "背部拉长",
+            head: [690, 548, 48],
+            torso: '<path d="M438 336 C520 414 606 486 690 548"/>',
+            arms: '<path d="M514 420 C626 442 706 476 770 524"/><path d="M500 452 C594 498 652 552 704 620"/>',
+            legs: '<path d="M438 336 L386 824"/><path d="M438 336 L486 824"/>',
+            guide: '<path d="M438 306 C548 392 652 474 758 560"/>',
+            joints: [[438, 336], [514, 420], [690, 548], [770, 524], [704, 620], [386, 824], [486, 824]],
+          },
+          low_lunge: {
+            hint: "前膝对脚尖",
+            head: [458, 246, 52],
+            torso: '<path d="M456 314 C462 420 458 516 444 600"/>',
+            arms: '<path d="M456 372 C352 410 286 466 230 546"/><path d="M456 372 C552 398 636 454 704 538"/>',
+            legs: '<path d="M444 600 C548 618 646 656 750 748"/><path d="M444 600 C354 676 276 724 180 762"/>',
+            guide: '<path d="M628 626 L748 748"/><path d="M248 730 L180 762"/>',
+            joints: [[458, 246], [456, 314], [456, 372], [444, 600], [230, 546], [704, 538], [750, 748], [180, 762]],
+          },
+          bridge: {
+            hint: "骨盆稳定",
+            head: [252, 646, 50],
+            torso: '<path d="M252 646 C392 512 544 510 684 650"/>',
+            arms: '<path d="M250 710 C360 738 506 738 680 708"/>',
+            legs: '<path d="M352 580 L304 774"/><path d="M606 584 L678 774"/>',
+            guide: '<path d="M340 548 C466 480 590 506 694 618"/>',
+            joints: [[252, 646], [392, 548], [544, 548], [684, 650], [304, 774], [678, 774], [250, 710], [680, 708]],
+          },
+          supine_twist: {
+            hint: "肩膀贴地",
+            head: [248, 596, 50],
+            torso: '<path d="M248 596 C386 560 520 562 650 604"/>',
+            arms: '<path d="M330 596 L250 760"/><path d="M448 576 L478 760"/>',
+            legs: '<path d="M370 570 C448 496 530 470 632 478"/><path d="M374 610 C478 690 570 724 720 710"/>',
+            guide: '<path d="M442 538 C526 508 594 516 660 560"/><path d="M460 642 C548 690 626 708 718 690"/>',
+            joints: [[248, 596], [370, 570], [520, 562], [650, 604], [632, 478], [720, 710], [250, 760], [478, 760]],
+          },
+        };
+        const scene = scenes[visualKey] || scenes[inferDemoVisualKey(poseName)] || scenes.standing_breath;
+        const [headX, headY, headR] = scene.head;
+        const joints = scene.joints
+          .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="14" fill="#FFFFFF" stroke="#6AC4BE" stroke-width="7"/>`)
+          .join("");
+
+        return (
+          "data:image/svg+xml;charset=UTF-8," +
+          encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1100">
+              <defs>
+                <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0" stop-color="#FFFFFF"/>
+                  <stop offset="0.6" stop-color="#F6FAFF"/>
+                  <stop offset="1" stop-color="#EAF8F7"/>
+                </linearGradient>
+                <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feDropShadow dx="0" dy="26" stdDeviation="28" flood-color="#6AC4BE" flood-opacity=".16"/>
+                </filter>
+              </defs>
+              <rect width="900" height="1100" fill="url(#bg)"/>
+              <rect x="150" y="814" width="600" height="72" rx="36" fill="#EAF8F7" opacity=".82"/>
+              <ellipse cx="450" cy="850" rx="296" ry="44" fill="#6AC4BE" opacity=".12"/>
+              <g fill="none" stroke="#6AC4BE" stroke-width="12" stroke-linecap="round" stroke-dasharray="18 20" opacity=".24">${scene.guide}</g>
+              <g filter="url(#softShadow)">
+                <g fill="none" stroke="#F4B79F" stroke-width="50" stroke-linecap="round" stroke-linejoin="round">${scene.legs}</g>
+                <g fill="none" stroke="#F4B79F" stroke-width="46" stroke-linecap="round" stroke-linejoin="round">${scene.arms}</g>
+                <g fill="none" stroke="#6AC4BE" stroke-width="72" stroke-linecap="round" stroke-linejoin="round">${scene.torso}</g>
+                <circle cx="${headX}" cy="${headY}" r="${headR}" fill="#F4B79F"/>
+                <circle cx="${headX + headR * 0.2}" cy="${headY - headR * 0.1}" r="5" fill="#27324A" opacity=".42"/>
+                <path d="M${headX - headR * 0.2} ${headY + headR * 0.2} C${headX} ${headY + headR * 0.34} ${headX + headR * 0.26} ${headY + headR * 0.22} ${headX + headR * 0.36} ${headY + headR * 0.06}" fill="none" stroke="#27324A" stroke-width="5" stroke-linecap="round" opacity=".28"/>
+              </g>
+              <g>${joints}</g>
+              <g>
+                <rect x="324" y="92" width="252" height="54" rx="27" fill="#FFFFFF" opacity=".9"/>
+                <text x="450" y="128" text-anchor="middle" font-size="26" font-weight="700" font-family="Microsoft YaHei, PingFang SC, sans-serif" fill="#6AC4BE">${escapeSvgText(scene.hint)}</text>
+              </g>
+              <text x="450" y="950" text-anchor="middle" font-size="54" font-weight="700" font-family="Microsoft YaHei, PingFang SC, sans-serif" fill="#27324A">${safePoseName}</text>
+              <text x="450" y="1018" text-anchor="middle" font-size="30" font-family="Microsoft YaHei, PingFang SC, sans-serif" fill="#6AC4BE">${safeTip}</text>
+            </svg>
+          `)
+        );
+      }
+
+      function getFallbackPose(pose, index = 0) {
+        const byId = FALLBACK_COURSE.poses.find(
+          (fallbackPose) => fallbackPose.pose_id === pose?.pose_id
+        );
+        return (
+          byId ||
+          FALLBACK_COURSE.poses[index % FALLBACK_COURSE.poses.length] ||
+          FALLBACK_COURSE.poses[0]
+        );
+      }
+
+      function buildFallbackCourseForPreferences(durationMinutes, focusId, safetyId = "none", bodyStateId = "stiff") {
+        const focusMeta = getOptionById(FOCUS_OPTIONS, focusId);
+        const bodyStateMeta = getOptionById(BODY_STATE_OPTIONS, bodyStateId);
+        const totalDurationSec = Math.max(60, Number(durationMinutes || 10) * 60);
+        const rawPoses = FALLBACK_COURSE.poses.filter((pose) =>
+          Array.isArray(pose.focus_tags)
+            ? pose.focus_tags.includes(focusId)
+            : focusId === "full_body"
+        );
+        const filteredPoses = rawPoses.filter(
+          (pose) => !(pose.avoid_for || []).includes(safetyId)
+        );
+        const poses = filteredPoses.length ? filteredPoses : [FALLBACK_COURSE.poses[0]];
+        const baseDuration = Math.floor(totalDurationSec / poses.length);
+        const safetyTip =
+          safetyId === "knee"
+            ? "已避开强膝盖负重动作。"
+            : safetyId === "waist"
+              ? "已避开大幅扭转和强后弯。"
+              : safetyId === "neck"
+                ? "会优先提醒肩颈放松。"
+                : "";
+
+        return {
+          ...FALLBACK_COURSE,
+          course_id: `course_local_${focusId}_${safetyId}_${durationMinutes}`,
+          course_title: `${durationMinutes}分钟${bodyStateMeta.label}${focusMeta.label}跟练`,
+          total_duration_sec: totalDurationSec,
+          plan_reason: `根据你的${focusMeta.requestText}、“${bodyStateMeta.label}”状态和 ${durationMinutes} 分钟时长，今天优先安排低强度基础动作。${safetyTip}我会把动作节奏放慢，提醒保持低频。`,
+          poses: poses.map((pose, index) => ({
+            ...pose,
+            guidance_tip: safetyTip ? `${pose.guidance_tip} ${safetyTip}` : pose.guidance_tip,
+            duration_sec:
+              index === poses.length - 1
+                ? totalDurationSec - baseDuration * (poses.length - 1)
+                : baseDuration,
+          })),
+        };
+      }
+
+      function buildCourseInsight(focusMeta, bodyStateMeta, safetyMeta, durationMinutes, course) {
+        if (typeof course?.plan_reason === "string" && course.plan_reason.trim()) {
+          return course.plan_reason.trim();
+        }
+
+        const poseNames = Array.isArray(course?.poses)
+          ? course.poses.slice(0, 3).map((pose) => pose.pose_name).filter(Boolean)
+          : [];
+        const poseText = poseNames.length ? poseNames.join("、") : "低强度伸展动作";
+        const safetyText =
+          safetyMeta?.id && safetyMeta.id !== "none"
+            ? `，并避开${safetyMeta.label}时不适合的高风险幅度`
+            : "";
+
+        return `根据你的${focusMeta.requestText}、“${bodyStateMeta.label}”状态和 ${durationMinutes} 分钟时长，今天先安排 ${poseText}${safetyText}。我会把动作节奏放慢，提醒保持低频，让你先建立舒服和稳定的感觉。`;
+      }
+
+      function buildNextPracticeRecommendation(errorCounts, focusLabel) {
+        const counts = errorCounts || {};
+        const entries = [
+          {
+            key: "shoulder_high",
+            count: counts.shoulder_high || 0,
+            text: "下次建议先做 6 分钟肩颈舒缓，把注意力放在沉肩和呼气上。",
+          },
+          {
+            key: "knee_inward",
+            count: counts.knee_inward || 0,
+            text: "下次建议加入 8 分钟下肢稳定练习，先练脚掌踩稳和膝盖朝向脚尖。",
+          },
+          {
+            key: "spine_rounding",
+            count: counts.spine_rounding || 0,
+            text: "下次建议做 8 分钟脊柱唤醒，让背部一节一节慢慢活动开。",
+          },
+          {
+            key: "hip_shift",
+            count: counts.hip_shift || 0,
+            text: "下次建议做 7 分钟骨盆稳定练习，动作小一点，先找左右平衡。",
+          },
+        ];
+        const mainIssue = entries.reduce((best, item) =>
+          item.count > best.count ? item : best
+        );
+
+        if (mainIssue.count > 0) return mainIssue.text;
+        return `下次可以继续做 8 分钟${focusLabel}，保持今天这种不着急的节奏。`;
+      }
+
+      function getCameraModeMeta(mode) {
+        const meta = {
+          half_body: {
+            label: "半身可练",
+            helper: "手机可以离你近一点，重点看肩颈和脊柱。",
+            short: "半身即可",
+          },
+          full_body: {
+            label: "建议全身",
+            helper: "需要看到头顶到脚踝，站远后会自动切大字提示。",
+            short: "全身入镜",
+          },
+          mat_view: {
+            label: "垫面视角",
+            helper: "手机可放低一些，优先听语音，不必一直看屏幕。",
+            short: "垫面角度",
+          },
+        };
+        return meta[mode] || meta.half_body;
+      }
+
+      function estimateCameraFraming(landmarks, poseConfig = {}) {
+        const reliable = Array.isArray(landmarks)
+          ? landmarks.filter(isReliableLandmark)
+          : [];
+        const required = poseConfig?.camera_mode_required || "half_body";
+        const requiredMeta = getCameraModeMeta(required);
+
+        if (reliable.length < 6) {
+          return {
+            bodyHeightRatio: 0,
+            isFar: false,
+            label: "等待入镜",
+            helper: requiredMeta.helper,
+          };
+        }
+
+        const minY = Math.min(...reliable.map((point) => point.y));
+        const maxY = Math.max(...reliable.map((point) => point.y));
+        const bodyHeightRatio = Math.max(0, Math.min(1, maxY - minY));
+        const isFar =
+          required === "full_body" && bodyHeightRatio > 0 && bodyHeightRatio < 0.56;
+
+        return {
+          bodyHeightRatio,
+          isFar,
+          label: isFar ? "远距离大字模式" : requiredMeta.label,
+          helper: isFar ? "你站得比较远，我会放大关键提示，主要听语音即可。" : requiredMeta.helper,
+        };
+      }
+
+      function formatTimer(totalSeconds) {
+        const safeSeconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+        const minutes = Math.floor(safeSeconds / 60);
+        const seconds = safeSeconds % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      }
+
+      function getStoredStreak() {
+        try {
+          const raw = window.localStorage?.getItem("yogamind_practice_streak");
+          const value = Number(raw);
+          return Number.isFinite(value) && value > 0 ? value : 0;
+        } catch (error) {
+          return 0;
+        }
+      }
+
+      function updatePracticeStreak() {
+        try {
+          const today = new Date().toISOString().slice(0, 10);
+          const lastDate = window.localStorage?.getItem("yogamind_last_practice_date");
+          const currentStreak = getStoredStreak();
+          const nextStreak = lastDate === today ? Math.max(1, currentStreak) : currentStreak + 1;
+          window.localStorage?.setItem("yogamind_last_practice_date", today);
+          window.localStorage?.setItem("yogamind_practice_streak", String(nextStreak));
+          return nextStreak;
+        } catch (error) {
+          return 1;
+        }
+      }
+
+      async function fetchJsonWithTimeout(path, payload) {
+        if (API_BASE_URL === "offline") {
+          throw new Error("当前为纯前端离线体验模式");
+        }
+
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+        try {
+          const response = await fetch(`${API_BASE_URL}${path}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            signal: controller.signal,
+          });
+
+          if (!response.ok) {
+            throw new Error(`API request failed: ${response.status}`);
+          }
+
+          return await response.json();
+        } finally {
+          window.clearTimeout(timer);
+        }
+      }
+
+      function normalizePose(pose, index = 0, usedDemoUrls = null) {
+        const fallback = getFallbackPose(pose, index);
+        const duration = Number(pose?.duration_sec);
+        const targetMin = Number(pose?.target_angle_min);
+        const targetMax = Number(pose?.target_angle_max);
+        const hasValidAngles =
+          Number.isFinite(targetMin) &&
+          Number.isFinite(targetMax) &&
+          targetMin >= 0 &&
+          targetMax <= 180 &&
+          targetMin <= targetMax;
+
+        const poseName = pose?.pose_name || fallback.pose_name;
+        const keyPointsTip =
+          typeof pose?.key_points_tip === "string" && pose.key_points_tip.trim()
+            ? pose.key_points_tip
+            : fallback.key_points_tip || "保持稳定呼吸，动作放慢，停在身体舒服的位置。";
+        const demoVisualKey =
+          typeof pose?.demo_visual_key === "string" && pose.demo_visual_key.trim()
+            ? pose.demo_visual_key.trim()
+            : fallback.demo_visual_key || inferDemoVisualKey(poseName, pose?.pose_id || fallback.pose_id);
+        let demoMediaUrl =
+          getDemoAssetUrl(demoVisualKey, poseName, pose?.pose_id || fallback.pose_id) ||
+          pose?.demo_media_url ||
+          fallback.demo_media_url ||
+          createPoseDemoPlaceholder(poseName, keyPointsTip, demoVisualKey);
+
+        if (usedDemoUrls?.has(demoMediaUrl)) {
+          demoMediaUrl =
+            pose?.demo_media_url && !usedDemoUrls.has(pose.demo_media_url)
+              ? pose.demo_media_url
+              : fallback.demo_media_url && !usedDemoUrls.has(fallback.demo_media_url)
+              ? fallback.demo_media_url
+              : createPoseDemoPlaceholder(poseName, keyPointsTip, demoVisualKey);
+        }
+        usedDemoUrls?.add(demoMediaUrl);
+
+        return {
+          ...fallback,
+          ...pose,
+          pose_id: pose?.pose_id || fallback.pose_id,
+          pose_name: poseName,
+          duration_sec:
+            Number.isFinite(duration) && duration > 0 ? duration : fallback.duration_sec,
+          target_angle_min: hasValidAngles ? targetMin : fallback.target_angle_min,
+          target_angle_max: hasValidAngles ? targetMax : fallback.target_angle_max,
+          guidance_tip:
+            typeof pose?.guidance_tip === "string" && pose.guidance_tip.trim()
+              ? pose.guidance_tip
+              : fallback.guidance_tip,
+          demo_media_url: demoMediaUrl,
+          demo_visual_key: demoVisualKey,
+          key_points_tip: keyPointsTip,
+          camera_mode_required:
+            typeof pose?.camera_mode_required === "string"
+              ? pose.camera_mode_required
+              : fallback.camera_mode_required || "half_body",
+          correction_error_key:
+            typeof pose?.correction_error_key === "string"
+              ? pose.correction_error_key
+              : fallback.correction_error_key,
+        };
+      }
+
+      function normalizeCourse(course) {
+        if (!Array.isArray(course?.poses) || course.poses.length === 0) {
+          return FALLBACK_COURSE;
+        }
+
+        const usedDemoUrls = new Set();
+        const poses = course.poses.map((pose, index) =>
+          normalizePose(pose, index, usedDemoUrls)
+        );
+        const totalDuration = Number(course?.total_duration_sec);
+
+        return {
+          ...FALLBACK_COURSE,
+          ...course,
+          course_id: course?.course_id || FALLBACK_COURSE.course_id,
+          course_title: course?.course_title || FALLBACK_COURSE.course_title,
+          plan_reason:
+            typeof course?.plan_reason === "string" && course.plan_reason.trim()
+              ? course.plan_reason.trim()
+              : FALLBACK_COURSE.plan_reason,
+          total_duration_sec:
+            Number.isFinite(totalDuration) && totalDuration > 0
+              ? totalDuration
+              : poses.reduce((sum, pose) => sum + pose.duration_sec, 0),
+          poses,
+        };
+      }
+
+      function normalizeSessionSummary(summary) {
+        if (typeof summary?.ai_feedback !== "string" || !summary.ai_feedback.trim()) {
+          return FALLBACK_SESSION_SUMMARY;
+        }
+
+        return {
+          ...FALLBACK_SESSION_SUMMARY,
+          ...summary,
+          summary_title:
+            typeof summary.summary_title === "string" && summary.summary_title.trim()
+              ? summary.summary_title
+              : FALLBACK_SESSION_SUMMARY.summary_title,
+          ai_feedback: summary.ai_feedback,
+          badge_awarded:
+            typeof summary.badge_awarded === "string" && summary.badge_awarded.trim()
+              ? summary.badge_awarded
+              : FALLBACK_SESSION_SUMMARY.badge_awarded,
+          next_practice_suggestion:
+            typeof summary.next_practice_suggestion === "string" &&
+            summary.next_practice_suggestion.trim()
+              ? summary.next_practice_suggestion
+              : FALLBACK_SESSION_SUMMARY.next_practice_suggestion,
+        };
+      }
+
+      const POSE_CONNECTIONS_FALLBACK = [
+        [11, 12],
+        [11, 13],
+        [13, 15],
+        [12, 14],
+        [14, 16],
+        [11, 23],
+        [12, 24],
+        [23, 24],
+        [23, 25],
+        [25, 27],
+        [24, 26],
+        [26, 28],
+        [27, 29],
+        [28, 30],
+        [29, 31],
+        [30, 32],
+      ];
+      const BODY_KEYPOINT_INDICES = new Set([
+        0, 11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28, 31, 32,
+      ]);
+
+      const POSE_PATTERN_LABELS = {
+        standing: "站姿",
+        all_fours: "四足跪姿",
+        mat_fold: "垫面前屈",
+        seated: "坐姿",
+        side_bend: "站姿侧伸展",
+        forward_fold: "站姿前屈",
+        lunge: "弓步",
+        bridge: "桥式",
+        supine_twist: "仰卧扭转",
+      };
+      const POSE_VISUAL_LABELS = {
+        standing_breath: "站姿呼吸",
+        cat_cow: "猫牛式",
+        child_pose: "婴儿式",
+        mountain: "山式站立",
+        seated_neck: "坐姿颈侧放松",
+        side_bend: "站姿侧伸展",
+        half_forward_fold: "半前屈伸展",
+        low_lunge: "低弓步",
+        bridge: "桥式预备",
+        supine_twist: "仰卧扭转",
+      };
+
+      const POSE_FEATURE_WEIGHTS = {
+        bodyRatio: 1.05,
+        torsoHorizontal: 1.2,
+        shoulderHipDelta: 1,
+        wristShoulderDelta: 0.85,
+        kneeHipDelta: 0.85,
+        kneeBend: 0.95,
+        sideLean: 0.7,
+        lowerSpread: 0.75,
+        bodyHeight: 0.65,
+      };
+
+      const POSE_FEATURE_TEMPLATES = {
+        standing_breath: {
+          pattern: "standing",
+          features: { bodyRatio: 0.46, torsoHorizontal: 0.08, shoulderHipDelta: -0.35, wristShoulderDelta: 0.27, kneeHipDelta: 0.28, kneeBend: 0.95, sideLean: 0.05, lowerSpread: 0.18, bodyHeight: 0.78 },
+        },
+        mountain: {
+          pattern: "standing",
+          features: { bodyRatio: 0.45, torsoHorizontal: 0.07, shoulderHipDelta: -0.36, wristShoulderDelta: 0.28, kneeHipDelta: 0.28, kneeBend: 0.96, sideLean: 0.05, lowerSpread: 0.18, bodyHeight: 0.78 },
+        },
+        side_bend: {
+          pattern: "side_bend",
+          features: { bodyRatio: 0.53, torsoHorizontal: 0.26, shoulderHipDelta: -0.32, wristShoulderDelta: -0.12, kneeHipDelta: 0.28, kneeBend: 0.95, sideLean: 0.28, lowerSpread: 0.18, bodyHeight: 0.76 },
+        },
+        half_forward_fold: {
+          pattern: "forward_fold",
+          features: { bodyRatio: 0.72, torsoHorizontal: 0.55, shoulderHipDelta: -0.08, wristShoulderDelta: 0.42, kneeHipDelta: 0.28, kneeBend: 0.86, sideLean: 0.2, lowerSpread: 0.16, bodyHeight: 0.68 },
+        },
+        low_lunge: {
+          pattern: "lunge",
+          features: { bodyRatio: 0.9, torsoHorizontal: 0.14, shoulderHipDelta: -0.34, wristShoulderDelta: 0.08, kneeHipDelta: 0.16, kneeBend: 0.58, sideLean: 0.07, lowerSpread: 0.62, bodyHeight: 0.62 },
+        },
+        cat_cow: {
+          pattern: "all_fours",
+          features: { bodyRatio: 1.55, torsoHorizontal: 0.78, shoulderHipDelta: -0.02, wristShoulderDelta: 0.3, kneeHipDelta: 0.18, kneeBend: 0.56, sideLean: 0.12, lowerSpread: 0.44, bodyHeight: 0.45 },
+        },
+        child_pose: {
+          pattern: "mat_fold",
+          features: { bodyRatio: 1.75, torsoHorizontal: 0.86, shoulderHipDelta: -0.02, wristShoulderDelta: 0.05, kneeHipDelta: 0.08, kneeBend: 0.34, sideLean: 0.18, lowerSpread: 0.45, bodyHeight: 0.34 },
+        },
+        seated_neck: {
+          pattern: "seated",
+          features: { bodyRatio: 0.9, torsoHorizontal: 0.14, shoulderHipDelta: -0.3, wristShoulderDelta: 0.16, kneeHipDelta: 0.02, kneeBend: 0.28, sideLean: 0.18, lowerSpread: 0.52, bodyHeight: 0.55 },
+        },
+        bridge: {
+          pattern: "bridge",
+          features: { bodyRatio: 1.7, torsoHorizontal: 0.82, shoulderHipDelta: 0.08, wristShoulderDelta: 0.06, kneeHipDelta: 0.08, kneeBend: 0.5, sideLean: 0.12, lowerSpread: 0.48, bodyHeight: 0.34 },
+        },
+        supine_twist: {
+          pattern: "supine_twist",
+          features: { bodyRatio: 1.95, torsoHorizontal: 0.88, shoulderHipDelta: 0.02, wristShoulderDelta: 0.02, kneeHipDelta: -0.04, kneeBend: 0.42, sideLean: 0.22, lowerSpread: 0.65, bodyHeight: 0.32 },
+        },
+      };
+
+      function calculateAngle(pointA, pointB, pointC) {
+        if (!pointA || !pointB || !pointC) return null;
+        const radians =
+          Math.atan2(pointC.y - pointB.y, pointC.x - pointB.x) -
+          Math.atan2(pointA.y - pointB.y, pointA.x - pointB.x);
+        let angle = Math.abs((radians * 180) / Math.PI);
+        if (angle > 180) angle = 360 - angle;
+        return angle;
+      }
+
+      function isReliableLandmark(point) {
+        if (!point) return false;
+        const visibility = Number(point.visibility);
+        const presence = Number(point.presence);
+        if (Number.isFinite(visibility)) return visibility > 0.18;
+        if (Number.isFinite(presence)) return presence > 0.18;
+        return true;
+      }
+
+      function countReliableLandmarks(landmarks) {
+        return Array.isArray(landmarks)
+          ? landmarks.reduce((count, point) => count + (isReliableLandmark(point) ? 1 : 0), 0)
+          : 0;
+      }
+
+
+      function getPointCenter(...points) {
+        const reliable = points.filter(isReliableLandmark);
+        if (!reliable.length) return null;
+        return {
+          x: reliable.reduce((sum, point) => sum + point.x, 0) / reliable.length,
+          y: reliable.reduce((sum, point) => sum + point.y, 0) / reliable.length,
+        };
+      }
+
+      function getExpectedPosePattern(poseConfig = {}) {
+        const visualKey =
+          poseConfig.demo_visual_key ||
+          inferDemoVisualKey(poseConfig.pose_name, poseConfig.pose_id);
+        const patternMap = {
+          standing_breath: "standing",
+          mountain: "standing",
+          cat_cow: "all_fours",
+          child_pose: "mat_fold",
+          seated_neck: "seated",
+          side_bend: "side_bend",
+          half_forward_fold: "forward_fold",
+          low_lunge: "lunge",
+          bridge: "bridge",
+          supine_twist: "supine_twist",
+        };
+        return patternMap[visualKey] || "standing";
+      }
+
+
+      function clamp01(value) {
+        if (!Number.isFinite(value)) return 0;
+        return Math.max(0, Math.min(1, value));
+      }
+
+      function distance2D(pointA, pointB) {
+        if (!pointA || !pointB) return null;
+        const dx = pointA.x - pointB.x;
+        const dy = pointA.y - pointB.y;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+
+      function extractPoseFeatureVector(landmarks) {
+        const bodyPoints = Array.from(BODY_KEYPOINT_INDICES)
+          .map((index) => landmarks[index])
+          .filter(isReliableLandmark);
+        if (bodyPoints.length < 8) return null;
+
+        const minX = Math.min(...bodyPoints.map((point) => point.x));
+        const maxX = Math.max(...bodyPoints.map((point) => point.x));
+        const minY = Math.min(...bodyPoints.map((point) => point.y));
+        const maxY = Math.max(...bodyPoints.map((point) => point.y));
+        const bodyWidth = Math.max(0.01, maxX - minX);
+        const bodyHeight = Math.max(0.01, maxY - minY);
+        const shoulder = getPointCenter(landmarks[11], landmarks[12]);
+        const hip = getPointCenter(landmarks[23], landmarks[24]);
+        const knee = getPointCenter(landmarks[25], landmarks[26]);
+        const ankle = getPointCenter(landmarks[27], landmarks[28], landmarks[31], landmarks[32]);
+        const wrist = getPointCenter(landmarks[15], landmarks[16]);
+        const head = getPointCenter(landmarks[0], landmarks[7], landmarks[8]);
+        if (!shoulder || !hip) return null;
+
+        const torsoDx = Math.abs(shoulder.x - hip.x);
+        const torsoDy = Math.abs(shoulder.y - hip.y);
+        const torsoHorizontal = torsoDx / Math.max(0.01, torsoDx + torsoDy);
+        const shoulderHipDelta = (shoulder.y - hip.y) / bodyHeight;
+        const wristShoulderDelta = wrist ? (wrist.y - shoulder.y) / bodyHeight : 0;
+        const kneeHipDelta = knee ? (knee.y - hip.y) / bodyHeight : 0;
+        const rightKneeAngle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+        const leftKneeAngle = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+        const kneeAngles = [rightKneeAngle, leftKneeAngle].filter(Number.isFinite);
+        const kneeBend = kneeAngles.length
+          ? kneeAngles.reduce((sum, angle) => sum + angle, 0) / kneeAngles.length / 180
+          : 0.72;
+        const sideLean = head ? Math.abs(head.x - hip.x) / bodyWidth : 0;
+        const lowerSpread = ankle && knee ? distance2D(ankle, knee) / bodyWidth : 0;
+
+        return {
+          bodyRatio: clamp01(bodyWidth / Math.max(0.01, bodyHeight) / 2.2),
+          torsoHorizontal: clamp01(torsoHorizontal),
+          shoulderHipDelta: clamp01((shoulderHipDelta + 0.5) / 1.0),
+          wristShoulderDelta: clamp01((wristShoulderDelta + 0.2) / 0.9),
+          kneeHipDelta: clamp01((kneeHipDelta + 0.15) / 0.65),
+          kneeBend: clamp01(kneeBend),
+          sideLean: clamp01(sideLean / 0.7),
+          lowerSpread: clamp01(lowerSpread / 1.0),
+          bodyHeight: clamp01(bodyHeight / 0.9),
+        };
+      }
+
+      function normalizeTemplateFeatures(features) {
+        return {
+          bodyRatio: clamp01((features.bodyRatio || 0) / 2.2),
+          torsoHorizontal: clamp01(features.torsoHorizontal || 0),
+          shoulderHipDelta: clamp01(((features.shoulderHipDelta || 0) + 0.5) / 1.0),
+          wristShoulderDelta: clamp01(((features.wristShoulderDelta || 0) + 0.2) / 0.9),
+          kneeHipDelta: clamp01(((features.kneeHipDelta || 0) + 0.15) / 0.65),
+          kneeBend: clamp01(features.kneeBend || 0),
+          sideLean: clamp01((features.sideLean || 0) / 0.7),
+          lowerSpread: clamp01(features.lowerSpread || 0),
+          bodyHeight: clamp01((features.bodyHeight || 0) / 0.9),
+        };
+      }
+
+      function comparePoseFeatureVectors(currentFeatures, templateFeatures) {
+        if (!currentFeatures || !templateFeatures) return 0;
+        const normalizedTemplate = normalizeTemplateFeatures(templateFeatures);
+        let weightedDistance = 0;
+        let totalWeight = 0;
+        Object.entries(POSE_FEATURE_WEIGHTS).forEach(([key, weight]) => {
+          const delta = Math.abs((currentFeatures[key] ?? 0) - (normalizedTemplate[key] ?? 0));
+          weightedDistance += delta * weight;
+          totalWeight += weight;
+        });
+        const meanDistance = weightedDistance / Math.max(0.001, totalWeight);
+        return Math.round(clamp01(1 - meanDistance) * 100) / 100;
+      }
+
+      function classifyPoseWithTemplates(landmarks) {
+        const features = extractPoseFeatureVector(landmarks);
+        if (!features) {
+          return { key: "unknown", pattern: "unknown", score: 0, scores: {}, features: null };
+        }
+
+        const scores = Object.fromEntries(
+          Object.entries(POSE_FEATURE_TEMPLATES).map(([key, template]) => [
+            key,
+            comparePoseFeatureVectors(features, template.features),
+          ])
+        );
+        const [key, score] = Object.entries(scores).sort((a, b) => b[1] - a[1])[0];
+        return {
+          key,
+          pattern: POSE_FEATURE_TEMPLATES[key]?.pattern || "unknown",
+          score,
+          scores,
+          features,
+        };
+      }
+
+      function classifyPosePattern(landmarks) {
+        const bodyPoints = Array.from(BODY_KEYPOINT_INDICES)
+          .map((index) => landmarks[index])
+          .filter(isReliableLandmark);
+        if (bodyPoints.length < 8) return { pattern: "unknown", confidence: 0 };
+
+        const minX = Math.min(...bodyPoints.map((point) => point.x));
+        const maxX = Math.max(...bodyPoints.map((point) => point.x));
+        const minY = Math.min(...bodyPoints.map((point) => point.y));
+        const maxY = Math.max(...bodyPoints.map((point) => point.y));
+        const bodyWidth = Math.max(0.01, maxX - minX);
+        const bodyHeight = Math.max(0.01, maxY - minY);
+        const shoulder = getPointCenter(landmarks[11], landmarks[12]);
+        const hip = getPointCenter(landmarks[23], landmarks[24]);
+        const knee = getPointCenter(landmarks[25], landmarks[26]);
+        const ankle = getPointCenter(landmarks[27], landmarks[28], landmarks[31], landmarks[32]);
+        const wrist = getPointCenter(landmarks[15], landmarks[16]);
+        const head = getPointCenter(landmarks[0], landmarks[7], landmarks[8]);
+
+        if (!shoulder || !hip) return { pattern: "unknown", confidence: 0 };
+
+        const torsoDx = Math.abs(shoulder.x - hip.x);
+        const torsoDy = Math.abs(shoulder.y - hip.y);
+        const isHorizontalBody = bodyWidth > bodyHeight * 1.22 || torsoDx > torsoDy * 1.25;
+        const isVerticalBody = bodyHeight > bodyWidth * 1.12 && torsoDy > torsoDx * 1.05;
+        const lowerBodyVisible = Boolean(knee && ankle);
+        const shoulderAboveHip = shoulder.y < hip.y - 0.08;
+        const handsNearFloor = wrist ? wrist.y > shoulder.y + 0.18 : false;
+        const kneesNearHands = wrist && knee ? Math.abs(wrist.y - knee.y) < 0.2 : false;
+        const hipsLow = hip.y > 0.48;
+
+        if (lowerBodyVisible) {
+          const rightKneeAngle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+          const leftKneeAngle = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+          const kneeAngles = [rightKneeAngle, leftKneeAngle].filter(Number.isFinite);
+          const hasBentKnee = kneeAngles.some((angle) => angle > 70 && angle < 135);
+          const hasLongStride = bodyWidth > 0.48 && ankle && knee && Math.abs(ankle.x - knee.x) > 0.12;
+          if (hasBentKnee && hasLongStride && bodyHeight > 0.45) {
+            return { pattern: "lunge", confidence: 0.78 };
+          }
+        }
+
+        if (isHorizontalBody && handsNearFloor && kneesNearHands && hip.y > shoulder.y - 0.06) {
+          return { pattern: "all_fours", confidence: 0.82 };
+        }
+
+        if (isHorizontalBody && hip.y > 0.5 && head && head.y > hip.y - 0.18 && bodyHeight < 0.46) {
+          const isBridgeLike = knee && shoulder && hip.y < knee.y - 0.05 && shoulder.y > hip.y - 0.04;
+          if (isBridgeLike) return { pattern: "bridge", confidence: 0.72 };
+          const isTwistLike = bodyWidth > 0.56 && lowerBodyVisible;
+          if (isTwistLike) return { pattern: "supine_twist", confidence: 0.7 };
+          return { pattern: "mat_fold", confidence: 0.64 };
+        }
+
+        if (isHorizontalBody && hip.y > 0.44 && handsNearFloor) {
+          return { pattern: "mat_fold", confidence: 0.72 };
+        }
+
+        if (hipsLow && knee && Math.abs(knee.y - hip.y) < 0.18 && bodyWidth > bodyHeight * 0.78) {
+          return { pattern: "seated", confidence: 0.76 };
+        }
+
+        if (isVerticalBody && lowerBodyVisible && shoulderAboveHip && hip.y > 0.34) {
+          const sideOffset = Math.abs((head?.x || shoulder.x) - hip.x);
+          const forwardFoldLike = shoulder.y > hip.y - 0.08 && torsoDx > torsoDy * 0.6;
+          if (forwardFoldLike) return { pattern: "forward_fold", confidence: 0.76 };
+          if (sideOffset > bodyWidth * 0.18) return { pattern: "side_bend", confidence: 0.68 };
+          return { pattern: "standing", confidence: 0.84 };
+        }
+
+        return { pattern: "unknown", confidence: 0.24 };
+      }
+
+      function evaluatePosePatternMismatch(landmarks, poseConfig = {}) {
+        const expected = getExpectedPosePattern(poseConfig);
+        const expectedVisualKey =
+          poseConfig.demo_visual_key ||
+          inferDemoVisualKey(poseConfig.pose_name, poseConfig.pose_id);
+        const templateMatch = classifyPoseWithTemplates(landmarks);
+        const templateScore = templateMatch.scores?.[expectedVisualKey] || 0;
+        const bestTemplateIsDifferent =
+          templateMatch.key !== "unknown" &&
+          templateMatch.key !== expectedVisualKey &&
+          templateMatch.score >= 0.64 &&
+          templateScore < 0.58 &&
+          templateMatch.score - templateScore >= 0.08;
+
+        if (bestTemplateIsDifferent) {
+          return {
+            mismatched: true,
+            expected,
+            actual: { pattern: templateMatch.pattern, confidence: templateMatch.score },
+            label: "动作匹配度低",
+            tip:
+              "现在更像" +
+              (POSE_VISUAL_LABELS[templateMatch.key] || POSE_PATTERN_LABELS[templateMatch.pattern] || "其他动作") +
+              "，" + getPoseEntryInstruction(expected),
+            errorIndices: [11, 12, 23, 24, 25, 26],
+          };
+        }
+
+        const actual = classifyPosePattern(landmarks);
+        if (actual.pattern === "unknown" || actual.confidence < 0.62) {
+          const isExpectedTemplateTooLow = templateScore > 0 && templateScore < 0.5;
+          return {
+            mismatched: isExpectedTemplateTooLow,
+            expected,
+            actual,
+            label: "动作匹配度低",
+            tip:
+              "我还没对上当前示范动作，请对照" +
+              (POSE_VISUAL_LABELS[expectedVisualKey] || POSE_PATTERN_LABELS[expected] || "示范动作") +
+              "。" + getPoseEntryInstruction(expected),
+            errorIndices: [11, 12, 23, 24],
+          };
+        }
+
+        const compatible = {
+          standing: ["standing", "side_bend"],
+          side_bend: ["side_bend", "standing"],
+          forward_fold: ["forward_fold", "standing"],
+          bridge: ["bridge", "supine_twist"],
+          supine_twist: ["supine_twist", "bridge"],
+        };
+        const allowed = compatible[expected] || [expected];
+        const mismatched = !allowed.includes(actual.pattern);
+        return {
+          mismatched,
+          expected,
+          actual,
+          label: "动作不匹配",
+          tip:
+            "现在识别到的是" +
+            (POSE_PATTERN_LABELS[actual.pattern] || "其他动作") +
+            "，" + getPoseEntryInstruction(expected),
+          errorIndices: [11, 12, 23, 24, 25, 26],
+        };
+      }
+
+      function evaluatePoseDeviation(landmarks, poseConfig = FALLBACK_COURSE.poses[0]) {
+        if (!Array.isArray(landmarks) || landmarks.length < 33) {
+          return {
+            hasPose: false,
+            hasDeviation: false,
+            visibleCount: 0,
+            angle: null,
+            errorIndices: [],
+            label: "等待识别",
+            quality: "no_pose",
+          };
+        }
+
+        const visibleCount = landmarks.reduce(
+          (count, point) => count + (isReliableLandmark(point) ? 1 : 0),
+          0
+        );
+        const ruleKey = poseConfig?.cv_rule_key || "spine_extension";
+        const targetMin = Number(poseConfig?.target_angle_min ?? 140);
+        const targetMax = Number(poseConfig?.target_angle_max ?? 180);
+        const framing = estimateCameraFraming(landmarks, poseConfig);
+        const cameraModeRequired = poseConfig?.camera_mode_required || "half_body";
+        const minVisibleCount =
+          cameraModeRequired === "full_body" ? 18 : cameraModeRequired === "mat_view" ? 10 : 8;
+
+        if (visibleCount < minVisibleCount) {
+          return {
+            hasPose: visibleCount >= 8,
+            hasDeviation: false,
+            visibleCount,
+            angle: null,
+            errorIndices: [],
+            label: `${getCameraModeMeta(cameraModeRequired).short}关键点不足`,
+            framing,
+            quality: visibleCount > 0 ? "partial_body" : "no_pose",
+          };
+        }
+
+        const patternMismatch = evaluatePosePatternMismatch(landmarks, poseConfig);
+        if (patternMismatch.mismatched) {
+          return {
+            hasPose: true,
+            hasDeviation: true,
+            visibleCount,
+            angle: null,
+            errorIndices: patternMismatch.errorIndices,
+            label: patternMismatch.label,
+            tip: patternMismatch.tip,
+            framing,
+            quality: "partial_body",
+            mismatch: patternMismatch,
+          };
+        }
+
+        if (ruleKey === "shoulder_relax") {
+          const leftEar = landmarks[7];
+          const rightEar = landmarks[8];
+          const leftShoulder = landmarks[11];
+          const rightShoulder = landmarks[12];
+          const leftHip = landmarks[23];
+          const rightHip = landmarks[24];
+          const needed = [leftEar, rightEar, leftShoulder, rightShoulder, leftHip, rightHip];
+          if (!needed.every(isReliableLandmark)) {
+            return {
+              hasPose: true,
+              hasDeviation: false,
+              visibleCount,
+            angle: null,
+            errorIndices: [],
+            label: "肩颈关键点不足",
+            framing,
+          };
+          }
+
+          const shoulderY = (leftShoulder.y + rightShoulder.y) / 2;
+          const earY = (leftEar.y + rightEar.y) / 2;
+          const hipY = (leftHip.y + rightHip.y) / 2;
+          const bodyScale = Math.max(0.08, Math.abs(hipY - shoulderY));
+          const relaxScore = Math.round(((shoulderY - earY) / bodyScale) * 100);
+          const hasDeviation = relaxScore < 30;
+          return {
+            hasPose: true,
+            hasDeviation,
+            visibleCount,
+            angle: relaxScore,
+            errorIndices: hasDeviation ? [11, 12] : [],
+            label: "沉肩空间",
+            framing,
+          };
+        }
+
+        if (ruleKey === "knee_alignment") {
+          const rightKneeAngle = calculateAngle(landmarks[24], landmarks[26], landmarks[28]);
+          const leftKneeAngle = calculateAngle(landmarks[23], landmarks[25], landmarks[27]);
+          const candidates = [
+            { side: "右膝稳定度", angle: rightKneeAngle, indices: [24, 26, 28] },
+            { side: "左膝稳定度", angle: leftKneeAngle, indices: [23, 25, 27] },
+          ].filter((item) => Number.isFinite(item.angle));
+
+          if (!candidates.length) {
+            return {
+              hasPose: true,
+              hasDeviation: false,
+              visibleCount,
+              angle: null,
+              errorIndices: [],
+              label: "膝盖关键点不足",
+              framing,
+            };
+          }
+
+          const tightest = candidates.reduce((worst, current) =>
+            current.angle < worst.angle ? current : worst
+          );
+          const hasDeviation = tightest.angle < targetMin || tightest.angle > targetMax;
+          return {
+            hasPose: true,
+            hasDeviation,
+            visibleCount,
+            angle: Math.round(tightest.angle),
+            errorIndices: hasDeviation ? tightest.indices : [],
+            label: tightest.side,
+            framing,
+          };
+        }
+
+        if (ruleKey === "hip_stability") {
+          const leftHip = landmarks[23];
+          const rightHip = landmarks[24];
+          const leftShoulder = landmarks[11];
+          const rightShoulder = landmarks[12];
+          const needed = [leftHip, rightHip, leftShoulder, rightShoulder];
+          if (!needed.every(isReliableLandmark)) {
+            return {
+              hasPose: true,
+              hasDeviation: false,
+              visibleCount,
+              angle: null,
+              errorIndices: [],
+              label: "骨盆关键点不足",
+              framing,
+            };
+          }
+
+          const shoulderWidth = Math.max(0.04, Math.abs(leftShoulder.x - rightShoulder.x));
+          const hipTiltScore = Math.round((Math.abs(leftHip.y - rightHip.y) / shoulderWidth) * 100);
+          const hasDeviation = hipTiltScore > 28;
+          return {
+            hasPose: true,
+            hasDeviation,
+            visibleCount,
+            angle: hipTiltScore,
+            errorIndices: hasDeviation ? [23, 24] : [],
+            label: "骨盆稳定",
+            framing,
+          };
+        }
+
+        const rightBodyAngle = calculateAngle(landmarks[12], landmarks[24], landmarks[26]);
+        const leftBodyAngle = calculateAngle(landmarks[11], landmarks[23], landmarks[25]);
+        const candidates = [
+          { side: "右侧脊柱线", angle: rightBodyAngle, indices: [12, 24, 26] },
+          { side: "左侧脊柱线", angle: leftBodyAngle, indices: [11, 23, 25] },
+        ].filter((item) => Number.isFinite(item.angle));
+
+        if (!candidates.length) {
+          return {
+            hasPose: true,
+            hasDeviation: false,
+            visibleCount,
+            angle: null,
+            errorIndices: [],
+            label: "关键点不足",
+            framing,
+          };
+        }
+
+        const tightest = candidates.reduce((worst, current) =>
+          current.angle < worst.angle ? current : worst
+        );
+        const hasDeviation = tightest.angle < targetMin || tightest.angle > targetMax;
+
+        return {
+          hasPose: true,
+          hasDeviation,
+          visibleCount,
+          angle: Math.round(tightest.angle),
+          errorIndices: hasDeviation ? tightest.indices : [],
+          label: tightest.side,
+          framing,
+        };
+      }
+
+      function fitCanvasToElement(canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(1, Math.round(rect.width));
+        const height = Math.max(1, Math.round(rect.height));
+        const pixelWidth = Math.round(width * dpr);
+        const pixelHeight = Math.round(height * dpr);
+
+        if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+          canvas.width = pixelWidth;
+          canvas.height = pixelHeight;
+        }
+
+        const context = canvas.getContext("2d");
+        context.setTransform(dpr, 0, 0, dpr, 0, 0);
+        context.clearRect(0, 0, width, height);
+        return { context, width, height };
+      }
+
+      function mapLandmarkToCanvas(point, video, width, height, mirrored) {
+        const videoWidth = video?.videoWidth || width;
+        const videoHeight = video?.videoHeight || height;
+        const videoRatio = videoWidth / videoHeight;
+        const canvasRatio = width / height;
+        let renderWidth = width;
+        let renderHeight = height;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        if (canvasRatio > videoRatio) {
+          renderHeight = width / videoRatio;
+          offsetY = (height - renderHeight) / 2;
+        } else {
+          renderWidth = height * videoRatio;
+          offsetX = (width - renderWidth) / 2;
+        }
+
+        const normalizedX = mirrored ? 1 - point.x : point.x;
+        return {
+          x: offsetX + normalizedX * renderWidth,
+          y: offsetY + point.y * renderHeight,
+        };
+      }
+
+      function drawPoseCanvas(canvas, video, landmarks, options = {}) {
+        if (!canvas) return;
+        const { context, width, height } = fitCanvasToElement(canvas);
+        if (!Array.isArray(landmarks) || landmarks.length < 33) return;
+
+        const mirrored = Boolean(options.mirrored);
+        const errorSet = new Set(options.errorIndices || []);
+        const connections = POSE_CONNECTIONS_FALLBACK;
+        const points = landmarks.map((point) =>
+          mapLandmarkToCanvas(point, video, width, height, mirrored)
+        );
+        drawSkeleton(context, points, landmarks, connections, errorSet);
+      }
+
+      function drawSkeleton(context, points, landmarks, connections, errorSet) {
+        context.save();
+        context.lineCap = "round";
+        context.lineJoin = "round";
+
+        connections.forEach(([from, to]) => {
+          if (!isReliableLandmark(landmarks[from]) || !isReliableLandmark(landmarks[to])) return;
+          const isProblem = errorSet.has(from) || errorSet.has(to);
+          const a = points[from];
+          const b = points[to];
+          context.beginPath();
+          context.moveTo(a.x, a.y);
+          context.lineTo(b.x, b.y);
+          context.strokeStyle = isProblem ? "rgba(243, 154, 114, 0.82)" : "rgba(106, 196, 190, 0.62)";
+          context.lineWidth = isProblem ? 3.2 : 1.7;
+          context.shadowColor = isProblem ? "rgba(243, 154, 114, 0.22)" : "rgba(106, 196, 190, 0.14)";
+          context.shadowBlur = isProblem ? 10 : 4;
+          context.stroke();
+        });
+
+        landmarks.forEach((landmark, index) => {
+          if (!BODY_KEYPOINT_INDICES.has(index)) return;
+          if (!isReliableLandmark(landmark)) return;
+          const point = points[index];
+          const isProblem = errorSet.has(index);
+          context.beginPath();
+          context.arc(point.x, point.y, isProblem ? 9 : 5, 0, Math.PI * 2);
+          context.fillStyle = isProblem ? "rgba(243, 154, 114, 0.16)" : "rgba(106, 196, 190, 0.10)";
+          context.fill();
+
+          context.beginPath();
+          context.arc(point.x, point.y, isProblem ? 4.8 : 2.8, 0, Math.PI * 2);
+          context.fillStyle = isProblem ? "rgba(243, 154, 114, 0.96)" : "rgba(106, 196, 190, 0.82)";
+          context.shadowColor = isProblem ? "rgba(243, 154, 114, 0.34)" : "rgba(106, 196, 190, 0.18)";
+          context.shadowBlur = isProblem ? 10 : 4;
+          context.fill();
+        });
+
+        context.restore();
+      }
+
+      const alignmentSteps = [
+        {
+          label: "准备站位引导",
+          helper: "请站到垫子中央。先不用摆姿势，自然站好就行。",
+          tone: "bg-[#EEF2F8] text-forest/66 border-[#DCE6F8]",
+          progress: 34,
+        },
+        {
+          label: "建议向后退两小步",
+          helper: "我需要看到头顶和脚踝，这样提醒会更准确。",
+          tone: "bg-[#FFF3D9] text-forest border-[#CDEDEA]",
+          progress: 68,
+        },
+        {
+          label: "站位引导完成",
+          helper: "开始后会进入实时摄像头识别，请保持自然呼吸。",
+          tone: "bg-[#EAF8F7] text-sage border-[#C9ECE8]",
+          progress: 100,
+        },
+      ];
+
+      function buildSessionMetrics(sessionStats) {
+        const durationSec = sessionStats?.durationSec || 600;
+        const durationMin = Math.max(1, Math.round(durationSec / 60));
+        const accuracy = sessionStats?.accuracy || 88;
+        const calories = Math.max(12, Math.round(durationMin * 4.2));
+
+        return [
+          { label: "体式稳定度", value: `${accuracy}%`, note: "今日表现" },
+          { label: "练习时长", value: `${durationMin} 分钟`, note: "新手友好" },
+          { label: "预计消耗", value: `${calories} kcal`, note: "轻柔强度" },
+        ];
+      }
+
+      const Icon = ({ type, className = "h-5 w-5" }) => {
+        const common = {
+          className,
+          viewBox: "0 0 24 24",
+          fill: "none",
+          stroke: "currentColor",
+          strokeWidth: "1.8",
+          strokeLinecap: "round",
+          strokeLinejoin: "round",
+          "aria-hidden": "true",
+        };
+
+        const paths = {
+          leaf: (
+            <>
+              <path d="M5.4 18.6c7.8.6 12.8-4.4 13.2-12.2C10.8 6 5.8 11 5.4 18.6Z" />
+              <path d="M7.4 16.6 15.7 8.3" />
+            </>
+          ),
+          play: <path d="M9 7.4v9.2l7.2-4.6L9 7.4Z" />,
+          pause: (
+            <>
+              <path d="M9 6.5v11" />
+              <path d="M15 6.5v11" />
+            </>
+          ),
+          voice: (
+            <>
+              <path d="M4.8 9.8v4.4h3.1l4 3.1V6.7l-4 3.1H4.8Z" />
+              <path d="M16 9.1c.9 1.8.9 4 0 5.8" />
+              <path d="M18.8 7.2c1.8 3 1.8 6.6 0 9.6" />
+            </>
+          ),
+          camera: (
+            <>
+              <path d="M4.5 8.4A2.4 2.4 0 0 1 6.9 6h10.2a2.4 2.4 0 0 1 2.4 2.4v7.2a2.4 2.4 0 0 1-2.4 2.4H6.9a2.4 2.4 0 0 1-2.4-2.4V8.4Z" />
+              <path d="m8.6 6 .9-1.5h5l.9 1.5" />
+              <path d="M12 14.8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+            </>
+          ),
+          skip: (
+            <>
+              <path d="m5.5 7.6 6.3 4.4-6.3 4.4V7.6Z" />
+              <path d="m13 7.6 6.3 4.4-6.3 4.4V7.6Z" />
+            </>
+          ),
+          share: (
+            <>
+              <path d="M8.4 12.7 15.5 17" />
+              <path d="M15.4 7 8.4 11.3" />
+              <path d="M6.5 14.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+              <path d="M17.5 8.8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+              <path d="M17.5 20.2a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+            </>
+          ),
+          home: (
+            <>
+              <path d="m4.7 11 7.3-6.1 7.3 6.1" />
+              <path d="M7 10.5v8.1h10v-8.1" />
+              <path d="M10 18.6v-5h4v5" />
+            </>
+          ),
+          close: (
+            <>
+              <path d="M7 7 17 17" />
+              <path d="M17 7 7 17" />
+            </>
+          ),
+          sparkle: (
+            <>
+              <path d="M12 3.8 13.6 9l5.2 1.6-5.2 1.6L12 17.4l-1.6-5.2-5.2-1.6L10.4 9 12 3.8Z" />
+              <path d="m18.4 16.2.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6.6-1.9Z" />
+            </>
+          ),
+        };
+
+        return <svg {...common}>{paths[type]}</svg>;
+      };
+
+      function App() {
+        const [activeView, setActiveView] = useState("align");
+        const [alignmentStep, setAlignmentStep] = useState(0);
+        const [formError, setFormError] = useState(false);
+        const [paused, setPaused] = useState(false);
+        const [muted, setMuted] = useState(false);
+        const [posterOpen, setPosterOpen] = useState(false);
+        const [summaryOpen, setSummaryOpen] = useState(false);
+        const [course, setCourse] = useState(FALLBACK_COURSE);
+        const [poseIndex, setPoseIndex] = useState(0);
+        const [currentPose, setCurrentPose] = useState(FALLBACK_COURSE.poses[0]);
+        const [sessionSummary, setSessionSummary] = useState(FALLBACK_SESSION_SUMMARY);
+        const [secondsLeft, setSecondsLeft] = useState(FALLBACK_COURSE.poses[0].duration_sec);
+        const [cameraMode, setCameraMode] = useState("front");
+        const [autoStartCount, setAutoStartCount] = useState(3);
+        const [loading, setLoading] = useState(false);
+        const [loadingText, setLoadingText] = useState("正在为你安排今天的轻练习...");
+        const [toast, setToast] = useState("");
+        const [selectedFocus, setSelectedFocus] = useState("shoulder");
+        const [selectedDuration, setSelectedDuration] = useState(10);
+        const [selectedBodyState, setSelectedBodyState] = useState("stiff");
+        const [selectedSafety, setSelectedSafety] = useState("none");
+        const [transitionPlan, setTransitionPlan] = useState(null);
+        const [transitionCount, setTransitionCount] = useState(3);
+        const [onboardingOpen, setOnboardingOpen] = useState(() => {
+          try { return window.localStorage.getItem("yogamind_onboarding_done") !== "1"; } catch (error) { return true; }
+        });
+        const [demoMode, setDemoMode] = useState(false);
+        const [practiceStreak, setPracticeStreak] = useState(() => getStoredStreak());
+        const [nextPractice, setNextPractice] = useState("下次可以继续做 8 分钟肩颈舒缓，保持今天这种不着急的节奏。");
+        const [sessionStats, setSessionStats] = useState({
+          accuracy: 88,
+          durationSec: FALLBACK_COURSE.total_duration_sec,
+        });
+        const [errorCounts, setErrorCounts] = useState({
+          shoulder_high: 0,
+          knee_inward: 0,
+          spine_rounding: 0,
+          hip_shift: 0,
+        });
+        const toastTimerRef = useRef(null);
+        const errorCountsRef = useRef(errorCounts);
+        const courseRef = useRef(course);
+        const poseIndexRef = useRef(poseIndex);
+        const startInFlightRef = useRef(false);
+        const finishInFlightRef = useRef(false);
+        const practiceStartedAtRef = useRef(null);
+
+        const showOfflineToast = (message = "网络连接较弱，已为你开启离线跟练模式") => {
+          setToast(message);
+          if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = window.setTimeout(() => setToast(""), 3600);
+        };
+
+        const selectedFocusMeta = useMemo(
+          () => getOptionById(FOCUS_OPTIONS, selectedFocus),
+          [selectedFocus]
+        );
+        const selectedBodyStateMeta = useMemo(
+          () => getOptionById(BODY_STATE_OPTIONS, selectedBodyState),
+          [selectedBodyState]
+        );
+        const selectedSafetyMeta = useMemo(
+          () => getOptionById(SAFETY_OPTIONS, selectedSafety),
+          [selectedSafety]
+        );
+        const courseInsight = useMemo(
+          () =>
+            buildCourseInsight(
+              selectedFocusMeta,
+              selectedBodyStateMeta,
+              selectedSafetyMeta,
+              selectedDuration,
+              course
+            ),
+          [selectedFocusMeta, selectedBodyStateMeta, selectedSafetyMeta, selectedDuration, course]
+        );
+
+        useEffect(() => {
+          const urls = Array.isArray(course?.poses)
+            ? course.poses.map((pose) => pose.demo_media_url).filter(Boolean)
+            : [];
+          urls.forEach((url) => {
+            const img = new Image();
+            img.decoding = "async";
+            img.src = url;
+          });
+        }, [course]);
+
+        const resetPracticeStats = () => {
+          const nextCounts = {
+            shoulder_high: 0,
+            knee_inward: 0,
+            spine_rounding: 0,
+            hip_shift: 0,
+          };
+          errorCountsRef.current = nextCounts;
+          setErrorCounts(nextCounts);
+          finishInFlightRef.current = false;
+        };
+
+        const recordFormError = (errorKey = "shoulder_high") => {
+          const allowedKeys = ["shoulder_high", "knee_inward", "spine_rounding", "hip_shift"];
+          const safeKey = allowedKeys.includes(errorKey) ? errorKey : "shoulder_high";
+          const nextCounts = {
+            ...errorCountsRef.current,
+            [safeKey]: (errorCountsRef.current[safeKey] || 0) + 1,
+          };
+          errorCountsRef.current = nextCounts;
+          setErrorCounts(nextCounts);
+        };
+
+        const startPractice = async () => {
+          if (!alignmentReady || loading || startInFlightRef.current) return;
+          setDemoMode(false);
+
+          startInFlightRef.current = true;
+          setLoadingText(
+            `正在根据你的${selectedFocusMeta.requestText}和 ${selectedDuration} 分钟时长安排练习...`
+          );
+          setLoading(true);
+          resetPracticeStats();
+
+          try {
+            const generatedCourse = await fetchJsonWithTimeout("/api/v1/course/generate", {
+              user_level: "beginner",
+              target_focus: selectedFocus,
+              duration_minutes: selectedDuration,
+              body_state: selectedBodyState,
+              safety: selectedSafety,
+            });
+            const safeCourse = normalizeCourse(generatedCourse);
+            const firstPose = safeCourse.poses[0] || FALLBACK_COURSE.poses[0];
+            setCourse(safeCourse);
+            setPoseIndex(0);
+            setCurrentPose(firstPose);
+            setSecondsLeft(firstPose.duration_sec || 60);
+            practiceStartedAtRef.current = Date.now();
+          } catch (error) {
+            const localCourse = buildFallbackCourseForPreferences(
+              selectedDuration,
+              selectedFocus,
+              selectedSafety,
+              selectedBodyState
+            );
+            showOfflineToast();
+            setCourse(localCourse);
+            setPoseIndex(0);
+            setCurrentPose(localCourse.poses[0]);
+            setSecondsLeft(localCourse.poses[0].duration_sec);
+            practiceStartedAtRef.current = Date.now();
+          } finally {
+            startInFlightRef.current = false;
+            setLoading(false);
+            setActiveView("practice");
+            setPaused(false);
+            setFormError(false);
+          }
+        };
+
+        const startDemoPractice = () => {
+          if (loading || startInFlightRef.current) return;
+          startInFlightRef.current = true;
+          resetPracticeStats();
+          const localCourse = buildFallbackCourseForPreferences(selectedDuration, selectedFocus, selectedSafety, selectedBodyState);
+          const firstPose = localCourse.poses[0] || FALLBACK_COURSE.poses[0];
+          setDemoMode(true); setCourse(localCourse); setPoseIndex(0); setCurrentPose(firstPose); setSecondsLeft(firstPose.duration_sec || 60);
+          practiceStartedAtRef.current = Date.now(); setFormError(false); setPaused(false); setActiveView("practice"); startInFlightRef.current = false;
+          showOfflineToast("已进入演示模式，不依赖摄像头和后端");
+        };
+        const closeOnboarding = () => { setOnboardingOpen(false); try { window.localStorage.setItem("yogamind_onboarding_done", "1"); } catch (error) {} };
+
+        const advancePoseOrFinish = () => {
+          const activeCourse = courseRef.current || FALLBACK_COURSE;
+          const currentIndex = poseIndexRef.current;
+          const nextPose = activeCourse.poses?.[currentIndex + 1];
+
+          if (nextPose) {
+            const normalizedNextPose = normalizePose(nextPose);
+            setFormError(false);
+            setPaused(true);
+            setTransitionPlan({
+              pose: normalizedNextPose,
+              index: currentIndex + 1,
+            });
+            setTransitionCount(3);
+            return;
+          }
+
+          finishPractice();
+        };
+
+        const finishPractice = async () => {
+          if (finishInFlightRef.current) return;
+
+          finishInFlightRef.current = true;
+          setPaused(true);
+          setLoadingText("正在整理本次练习总结...");
+          setLoading(true);
+
+          const activeCourse = courseRef.current || FALLBACK_COURSE;
+          const elapsedFromStart = practiceStartedAtRef.current
+            ? Math.round((Date.now() - practiceStartedAtRef.current) / 1000)
+            : 0;
+          const totalErrors = Object.values(errorCountsRef.current).reduce(
+            (sum, value) => sum + value,
+            0
+          );
+          const accuracyScore = Math.max(72, Math.min(96, 92 - totalErrors * 2));
+          const plannedDurationSec = activeCourse.total_duration_sec || selectedDuration * 60;
+          const actualDurationSec = Math.max(
+            1,
+            Math.min(plannedDurationSec, elapsedFromStart || plannedDurationSec)
+          );
+          setSessionStats({
+            accuracy: accuracyScore,
+            durationSec: actualDurationSec,
+            courseTitle: activeCourse.course_title,
+            bestPoseName: currentPose?.pose_name || activeCourse.poses?.[0]?.pose_name || "今日练习",
+          });
+          const updatedStreak = updatePracticeStreak();
+          setPracticeStreak(updatedStreak);
+          setNextPractice(
+            buildNextPracticeRecommendation(errorCountsRef.current, selectedFocusMeta.label)
+          );
+
+          try {
+            const summary = await fetchJsonWithTimeout("/api/v1/session/submit", {
+              course_id: activeCourse.course_id,
+              actual_duration_sec: actualDurationSec,
+              accuracy_score: accuracyScore,
+              error_counts: errorCountsRef.current,
+            });
+            const safeSummary = normalizeSessionSummary(summary);
+            setSessionSummary(safeSummary);
+            setNextPractice(
+              safeSummary.next_practice_suggestion ||
+                buildNextPracticeRecommendation(errorCountsRef.current, selectedFocusMeta.label)
+            );
+          } catch (error) {
+            showOfflineToast("网络连接较弱，已为你生成离线练习总结");
+            const offlineNextPractice = buildNextPracticeRecommendation(
+              errorCountsRef.current,
+              selectedFocusMeta.label
+            );
+            setNextPractice(offlineNextPractice);
+            setSessionSummary({
+              ...FALLBACK_SESSION_SUMMARY,
+              ai_feedback: `今天你完成了约 ${Math.round(
+                (activeCourse.total_duration_sec || 600) / 60
+              )} 分钟练习，整体标准率约 ${accuracyScore}%。继续保持沉肩呼吸，动作不用很大，稳定就是很好的进步。`,
+              next_practice_suggestion: offlineNextPractice,
+            });
+          } finally {
+            setLoading(false);
+            setActiveView("summary");
+            setSummaryOpen(true);
+          }
+        };
+
+        const alignmentReady = alignmentStep === 2;
+
+        useEffect(() => {
+          if (activeView !== "align") return;
+          setAlignmentStep(0);
+          setAutoStartCount(3);
+          const timers = [
+            window.setTimeout(() => setAlignmentStep(1), 1200),
+            window.setTimeout(() => setAlignmentStep(2), 2800),
+          ];
+          return () => timers.forEach(window.clearTimeout);
+        }, [activeView]);
+
+        useEffect(() => {
+          if (activeView !== "practice" || paused) return;
+          const interval = window.setInterval(() => {
+            setSecondsLeft((value) => {
+              if (value > 1) return value - 1;
+              window.setTimeout(advancePoseOrFinish, 0);
+              return 0;
+            });
+          }, 1000);
+          return () => window.clearInterval(interval);
+        }, [activeView, paused]);
+
+        useEffect(() => {
+          if (activeView !== "align" || alignmentStep !== 2) return;
+
+          if (autoStartCount <= 0) {
+            return;
+          }
+
+          const timer = window.setTimeout(() => {
+            setAutoStartCount((value) => value - 1);
+          }, 1000);
+
+          return () => window.clearTimeout(timer);
+        }, [activeView, alignmentStep, autoStartCount]);
+
+        useEffect(() => {
+          if (!transitionPlan) return;
+
+          if (transitionCount <= 0) {
+            setPoseIndex(transitionPlan.index);
+            poseIndexRef.current = transitionPlan.index;
+            setCurrentPose(transitionPlan.pose);
+            setSecondsLeft(transitionPlan.pose.duration_sec || 60);
+            setTransitionPlan(null);
+            setTransitionCount(3);
+            setPaused(false);
+            return;
+          }
+
+          const timer = window.setTimeout(() => {
+            setTransitionCount((value) => value - 1);
+          }, 1000);
+
+          return () => window.clearTimeout(timer);
+        }, [transitionPlan, transitionCount]);
+
+        useEffect(() => {
+          if (activeView !== "practice") {
+            setTransitionPlan(null);
+            setTransitionCount(3);
+          }
+        }, [activeView]);
+
+        useEffect(() => {
+          courseRef.current = course;
+        }, [course]);
+
+        useEffect(() => {
+          poseIndexRef.current = poseIndex;
+        }, [poseIndex]);
+
+        useEffect(() => {
+          return () => {
+            if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+          };
+        }, []);
+
+        useEffect(() => {
+          if (!posterOpen) return;
+          const previousOverflow = document.body.style.overflow;
+          document.body.style.overflow = "hidden";
+          return () => {
+            document.body.style.overflow = previousOverflow;
+          };
+        }, [posterOpen]);
+
+        const backHome = () => {
+          setActiveView("align");
+          setFormError(false);
+          setPaused(false);
+          setPosterOpen(false);
+          setSummaryOpen(false);
+          setPoseIndex(0);
+          setTransitionPlan(null);
+          setTransitionCount(3);
+          startInFlightRef.current = false;
+          finishInFlightRef.current = false;
+        };
+
+        const hasNextPose = Boolean(course.poses?.[poseIndex + 1]);
+
+        return (
+          <main className="min-h-[100dvh] overflow-hidden pb-24 text-forest sm:pb-0">
+            <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-7xl flex-col px-4 py-4 sm:px-6 lg:px-8">
+              <TopNavigation activeView={activeView} setActiveView={setActiveView} />
+
+              <section className="flex flex-1 items-start py-3 md:items-center md:py-8">
+                <div className={["w-full", activeView === "align" ? "" : "animate-settle"].join(" ")}>
+                  {activeView === "align" && (
+                    <AlignmentView
+                      step={alignmentStep}
+                      ready={alignmentReady}
+                      countdown={autoStartCount}
+                      loading={loading}
+                      selectedFocus={selectedFocus}
+                      setSelectedFocus={setSelectedFocus}
+                      selectedDuration={selectedDuration}
+                      setSelectedDuration={setSelectedDuration}
+                      selectedBodyState={selectedBodyState}
+                      setSelectedBodyState={setSelectedBodyState}
+                      selectedSafety={selectedSafety}
+                      setSelectedSafety={setSelectedSafety}
+                      selectedFocusMeta={selectedFocusMeta}
+                      selectedBodyStateMeta={selectedBodyStateMeta}
+                      selectedSafetyMeta={selectedSafetyMeta}
+                      onStart={startPractice}
+                      onStartDemo={startDemoPractice}
+                      onOpenGuide={() => setOnboardingOpen(true)}
+                    />
+                  )}
+                  {activeView === "practice" && (
+                    <PracticeView
+                      formError={formError}
+                      setFormError={setFormError}
+                      paused={paused}
+                      setPaused={setPaused}
+                      muted={muted}
+                      setMuted={setMuted}
+                      cameraMode={cameraMode}
+                      setCameraMode={setCameraMode}
+                      secondsLeft={secondsLeft}
+                      currentPose={currentPose}
+                      poseIndex={poseIndex}
+                      poseCount={course.poses?.length || 1}
+                      courseInsight={courseInsight}
+                      errorCounts={errorCounts}
+                      hasNextPose={hasNextPose}
+                      demoMode={demoMode}
+                      onFormErrorConfirmed={recordFormError}
+                      onSummary={advancePoseOrFinish}
+                      onExit={backHome}
+                    />
+                  )}
+                  {activeView === "summary" && (
+                    <SummaryView
+                      sessionSummary={sessionSummary}
+                      nextPractice={nextPractice}
+                      practiceStreak={practiceStreak}
+                      sessionStats={sessionStats}
+                      onPoster={() => setPosterOpen(true)}
+                      onBackHome={backHome}
+                    />
+                  )}
+                </div>
+              </section>
+            </div>
+
+            {onboardingOpen && <OnboardingModal onClose={closeOnboarding} />}
+            {toast && <Toast message={toast} />}
+            {loading && <LoadingOverlay message={loadingText} />}
+            {transitionPlan && (
+              <PoseTransitionOverlay pose={transitionPlan.pose} countdown={transitionCount} />
+            )}
+            {summaryOpen && (
+              <SessionSummaryModal
+                summary={sessionSummary}
+                onClose={() => setSummaryOpen(false)}
+                onPoster={() => {
+                  setSummaryOpen(false);
+                  setPosterOpen(true);
+                }}
+              />
+            )}
+            {posterOpen && (
+              <SharePosterModal
+                onClose={() => setPosterOpen(false)}
+                sessionStats={sessionStats}
+                sessionSummary={sessionSummary}
+              />
+            )}
+            <MobileTabBar activeView={activeView} setActiveView={setActiveView} />
+          </main>
+        );
+      }
+
+      function LoadingOverlay({ message }) {
+        return (
+          <div className="fixed inset-0 z-40 grid place-items-center bg-linen/88 px-6 backdrop-blur-md">
+            <section className="w-full max-w-sm rounded-[32px] border border-white/80 bg-cream p-7 text-center shadow-soft">
+              <div className="mx-auto grid h-20 w-20 place-items-center rounded-[28px] bg-night">
+                <div className="h-12 w-12 animate-breathe rounded-full border-[10px] border-lime/24 border-t-lime" />
+              </div>
+              <h3 className="mt-6 text-xl font-semibold text-forest">{message}</h3>
+              <p className="mt-3 text-sm leading-6 text-forest/62">
+                正在匹配适合新手的低强度课程。
+              </p>
+            </section>
+          </div>
+        );
+      }
+
+      function OnboardingModal({ onClose }) {
+        return (<div className="fixed inset-0 z-40 flex items-end bg-forest/24 px-4 pb-4 pt-10 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6"><section className="w-full max-w-md rounded-[30px] border border-white/80 bg-cream p-5 shadow-soft sm:p-6"><div className="flex items-start justify-between gap-4"><div><p className="text-sm font-semibold text-sage">第一次练习前</p><h2 className="mt-2 text-2xl font-semibold leading-tight text-forest">先花 20 秒把体验调舒服</h2></div><button onClick={onClose} className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-mist text-forest/70 transition active:scale-[0.98]" aria-label="关闭新手引导">×</button></div><div className="mt-5 space-y-3">{ONBOARDING_STEPS.map((step, index) => (<article key={step.title} className="flex gap-3 rounded-[22px] bg-linen p-3.5"><span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-night text-sm font-semibold text-lime">{index + 1}</span><div><div className="flex items-center gap-2"><h3 className="text-base font-semibold text-forest">{step.title}</h3><span className="rounded-full bg-cream px-2 py-0.5 text-[11px] font-semibold text-sage">{step.tag}</span></div><p className="mt-1.5 text-sm leading-6 text-forest/64">{step.text}</p></div></article>))}</div><button onClick={onClose} className="mt-5 w-full rounded-[22px] bg-night px-5 py-4 text-base font-semibold text-lime shadow-soft transition active:translate-y-[1px]">我知道了，开始准备</button></section></div>);
+      }
+      function FarReadingHero({ pose, timeLabel, message, trackingQualityMeta, speaking }) {
+        return (<section className="mb-3 rounded-[30px] border border-white/14 bg-white/10 p-4 text-white backdrop-blur-md sm:hidden"><div className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="text-xs font-semibold text-lime/80">远距离大字模式</p><h3 className="mt-1 truncate text-4xl font-semibold leading-none text-white">{pose?.pose_name || "当前动作"}</h3></div><span className="rounded-full bg-lime px-4 py-2 text-2xl font-semibold tabular-nums text-night">{timeLabel}</span></div><p className="mt-4 text-2xl font-semibold leading-snug text-white">{message}</p><div className="mt-4 flex items-center justify-between gap-3 rounded-[22px] bg-night/40 px-3 py-2.5"><span className={["rounded-full px-3 py-1.5 text-xs font-semibold", trackingQualityMeta.tone].join(" ")}>{trackingQualityMeta.label}</span><span className="text-xs font-semibold text-white/62">{speaking ? "正在轻声提醒" : "可主要听语音"}</span></div></section>);
+      }
+
+      function PoseTransitionOverlay({ pose, countdown }) {
+        return (
+          <div className="fixed inset-0 z-30 grid place-items-center bg-linen/82 px-5 backdrop-blur-md">
+            <section className="w-full max-w-[360px] rounded-[32px] border border-white/80 bg-cream p-5 text-center shadow-soft">
+              <p className="text-sm font-semibold text-sage">下一个动作</p>
+              <h3 className="mt-2 text-3xl font-semibold leading-tight text-forest">
+                {pose?.pose_name || "下一体式"}
+              </h3>
+              <p className="mt-3 text-sm leading-6 text-forest/64">
+                {pose?.key_points_tip || "先站稳，慢慢进入动作。"}
+              </p>
+              <div className="mx-auto mt-6 grid h-20 w-20 place-items-center rounded-[28px] bg-night text-3xl font-semibold text-lime shadow-inset">
+                {Math.max(countdown, 0)}
+              </div>
+              <p className="mt-5 text-sm font-semibold text-forest/58">
+                先调整脚步，我会等你准备好
+              </p>
+            </section>
+          </div>
+        );
+      }
+
+      function Toast({ message }) {
+        return (
+          <div className="fixed left-1/2 top-5 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-[24px] border border-lime/25 bg-night/92 px-4 py-3 text-sm font-semibold text-white shadow-lifted backdrop-blur-md">
+            {message}
+          </div>
+        );
+      }
+
+      function SessionSummaryModal({ summary, onClose, onPoster }) {
+        return (
+          <div
+            className="fixed inset-0 z-30 flex items-center justify-center overflow-y-auto bg-forest/24 px-4 py-6 backdrop-blur-sm"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) onClose();
+            }}
+          >
+            <section
+              className="w-full max-w-md rounded-[32px] border border-white/80 bg-cream p-5 shadow-soft"
+              role="dialog"
+              aria-modal="true"
+              aria-label="AI 练习总结"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[20px] bg-night text-lime">
+                  <Icon type="sparkle" />
+                </div>
+                <button
+                  onClick={onClose}
+                  className="grid h-10 w-10 place-items-center rounded-full bg-linen text-forest transition hover:bg-sand/55 active:scale-[0.98]"
+                  aria-label="关闭总结"
+                >
+                  <Icon type="close" />
+                </button>
+              </div>
+
+              <h3 className="mt-5 text-2xl font-semibold leading-tight text-forest">
+                {summary?.summary_title || FALLBACK_SESSION_SUMMARY.summary_title}
+              </h3>
+              <p className="mt-4 text-base leading-7 text-forest/72">
+                {summary?.ai_feedback || FALLBACK_SESSION_SUMMARY.ai_feedback}
+              </p>
+
+              <div className="mt-5 rounded-[24px] bg-linen p-4">
+                <p className="text-xs font-semibold text-forest/52">本次获得</p>
+                <p className="mt-1 text-lg font-semibold text-sage">
+                  {summary?.badge_awarded || FALLBACK_SESSION_SUMMARY.badge_awarded}
+                </p>
+              </div>
+
+              <div className="mt-3 rounded-[24px] border border-sand/70 bg-cream p-4 shadow-sm">
+                <p className="text-xs font-semibold text-forest/52">下次建议</p>
+                <p className="mt-1 text-sm leading-6 text-forest/70">
+                  {summary?.next_practice_suggestion ||
+                    FALLBACK_SESSION_SUMMARY.next_practice_suggestion}
+                </p>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={onPoster}
+                  className="rounded-[18px] bg-night px-4 py-3 text-sm font-semibold text-lime transition hover:bg-[#465BC8] active:translate-y-[1px]"
+                >
+                  生成分享卡
+                </button>
+                <button
+                  onClick={onClose}
+                  className="rounded-[18px] border border-sand bg-cream px-4 py-3 text-sm font-semibold text-forest transition hover:bg-sand/45 active:translate-y-[1px]"
+                >
+                  先看看回顾
+                </button>
+              </div>
+            </section>
+          </div>
+        );
+      }
+
+      function TopNavigation({ activeView, setActiveView }) {
+        return (
+          <header
+            className={[
+              "mx-auto w-full max-w-5xl items-center justify-between gap-3 rounded-[28px] border border-white/80 bg-cream/86 p-2 shadow-soft shadow-inset backdrop-blur-xl",
+              activeView === "practice" ? "hidden sm:flex" : "flex",
+            ].join(" ")}
+          >
+            <button
+              onClick={() => setActiveView("align")}
+              className="flex min-w-0 items-center gap-3 rounded-[22px] px-2 py-2 text-left transition active:scale-[0.98]"
+              aria-label="返回灵瑜 AI 首页"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[18px] bg-night text-lime shadow-lifted">
+                <Icon type="leaf" />
+              </span>
+              <span className="hidden leading-tight sm:block">
+                <span className="block text-base font-semibold">灵瑜 AI</span>
+                <span className="block text-xs text-forest/58">AI 姿态跟练 H5</span>
+              </span>
+            </button>
+
+            <nav className="hidden flex-1 grid-cols-3 gap-1 rounded-[20px] bg-[#EEF3FF] p-1 sm:grid sm:max-w-[360px]">
+              {views.map((view) => {
+                const isActive = activeView === view.id;
+                return (
+                  <button
+                    key={view.id}
+                    onClick={() => setActiveView(view.id)}
+                    className={[
+                      "rounded-[16px] px-3 py-2 text-sm font-semibold transition",
+                      "focus:outline-none focus:ring-2 focus:ring-sage/35 active:scale-[0.98]",
+                      isActive
+                        ? "bg-night text-lime shadow-sm"
+                        : "text-forest/60 hover:bg-cream/60 hover:text-forest",
+                    ].join(" ")}
+                  >
+                    {view.label}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="rounded-full bg-mist px-3 py-1.5 text-xs font-semibold text-sage sm:hidden">
+              H5 体验版
+            </div>
+          </header>
+        );
+      }
+
+      function MobileTabBar({ activeView, setActiveView }) {
+        return (
+          <nav className="fixed inset-x-4 bottom-4 z-10 grid grid-cols-3 gap-1 rounded-[26px] border border-white/80 bg-cream/92 p-1.5 shadow-soft backdrop-blur-xl sm:hidden">
+            {views.map((view) => {
+              const isActive = activeView === view.id;
+              const icon = view.id === "align" ? "leaf" : view.id === "practice" ? "play" : "sparkle";
+              return (
+                <button
+                  key={view.id}
+                  onClick={() => setActiveView(view.id)}
+                  className={[
+                    "flex min-h-12 items-center justify-center gap-1.5 rounded-[20px] text-sm font-semibold transition active:scale-[0.98]",
+                    isActive ? "bg-night text-lime" : "text-forest/58",
+                  ].join(" ")}
+                >
+                  <Icon type={icon} className="h-4 w-4" />
+                  {view.label}
+                </button>
+              );
+            })}
+          </nav>
+        );
+      }
+
+      function PracticePreferencePanel({
+        selectedFocus,
+        setSelectedFocus,
+        selectedDuration,
+        setSelectedDuration,
+        selectedBodyState,
+        setSelectedBodyState,
+        selectedSafety,
+        setSelectedSafety,
+      }) {
+        return (
+          <div className="mt-3 space-y-2.5 rounded-[22px] bg-cream p-2.5 text-forest shadow-lifted sm:mt-6 sm:space-y-5 sm:rounded-[28px] sm:p-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between sm:mb-3">
+                <p className="text-sm font-semibold text-forest">今天主要想照顾哪里</p>
+                <span className="text-xs font-semibold text-sage">1 分钟内开始</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-1">
+                {FOCUS_OPTIONS.map((option) => {
+                  const selected = option.id === selectedFocus;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setSelectedFocus(option.id)}
+                      className={[
+                        "flex min-h-[50px] flex-col justify-between gap-1 rounded-[16px] border px-2.5 py-2 text-left transition active:scale-[0.99] sm:min-h-0 sm:flex-row sm:items-center sm:gap-3 sm:rounded-2xl sm:px-4 sm:py-3",
+                        selected
+                          ? "border-sage/34 bg-mist text-forest shadow-sm"
+                          : "border-sand/60 bg-linen/58 text-forest/72 hover:bg-linen",
+                      ].join(" ")}
+                    >
+                      <span>
+                        <span className="block text-sm font-semibold sm:text-base">{option.label}</span>
+                        <span className="mt-1 hidden text-sm leading-5 text-forest/58 sm:block">
+                          {option.helper}
+                        </span>
+                      </span>
+                      <span
+                        className={[
+                          "grid h-5 w-5 shrink-0 place-items-center rounded-full border sm:h-6 sm:w-6",
+                          selected ? "border-sage bg-sage" : "border-sand bg-cream",
+                        ].join(" ")}
+                      >
+                        {selected && <span className="h-2 w-2 rounded-full bg-cream" />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-2.5 sm:grid-cols-[1fr_1.15fr] sm:gap-4">
+              <div>
+                <p className="mb-2 text-sm font-semibold text-forest sm:mb-3">练习时长</p>
+                <div className="grid grid-cols-3 gap-2 rounded-[18px] bg-linen p-1 sm:rounded-2xl">
+                  {DURATION_OPTIONS.map((duration) => {
+                    const selected = duration === selectedDuration;
+                    return (
+                      <button
+                        key={duration}
+                        onClick={() => setSelectedDuration(duration)}
+                        className={[
+                          "rounded-xl px-3 py-2 text-sm font-semibold transition active:scale-[0.98]",
+                          selected ? "bg-cream text-sage shadow-sm" : "text-forest/58",
+                        ].join(" ")}
+                      >
+                        {duration}分
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-sm font-semibold text-forest sm:mb-3">身体状态</p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-1">
+                  {BODY_STATE_OPTIONS.map((option) => {
+                    const selected = option.id === selectedBodyState;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => setSelectedBodyState(option.id)}
+                        className={[
+                          "flex min-h-[40px] flex-col justify-center rounded-[14px] border px-2 py-1.5 text-center text-xs transition active:scale-[0.99] sm:min-h-0 sm:flex-row sm:items-center sm:justify-between sm:rounded-xl sm:px-3 sm:text-left sm:text-sm",
+                          selected
+                            ? "border-sage/28 bg-mist text-sage"
+                            : "border-sand/60 bg-linen/50 text-forest/62",
+                        ].join(" ")}
+                      >
+                        <span className="font-semibold">{option.label}</span>
+                        <span className="mt-1 hidden text-xs text-forest/48 sm:mt-0 sm:block">{option.helper}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between sm:mb-3">
+                <p className="text-sm font-semibold text-forest">安全边界</p>
+                <span className="text-xs font-semibold text-forest/42">非医疗建议</span>
+              </div>
+              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+                {SAFETY_OPTIONS.map((option) => {
+                  const selected = option.id === selectedSafety;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setSelectedSafety(option.id)}
+                      className={[
+                        "shrink-0 rounded-full border px-3.5 py-2 text-xs font-semibold transition active:scale-[0.98] sm:text-sm",
+                        selected
+                          ? "border-night bg-night text-lime shadow-sm"
+                          : "border-sand/70 bg-linen/54 text-forest/62",
+                      ].join(" ")}
+                      title={option.helper}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function AlignmentView({
+        step,
+        ready,
+        countdown,
+        loading,
+        selectedFocus,
+        setSelectedFocus,
+        selectedDuration,
+        setSelectedDuration,
+        selectedBodyState,
+        setSelectedBodyState,
+        selectedSafety,
+        setSelectedSafety,
+        selectedFocusMeta,
+        selectedBodyStateMeta,
+        selectedSafetyMeta,
+        onStart,
+        onStartDemo,
+        onOpenGuide,
+      }) {
+        const status = alignmentSteps[step];
+        const statusLabel = ready
+          ? Math.max(countdown, 0) > 0
+            ? `站位已确认，${Math.max(countdown, 0)} 秒后可开始`
+            : "站位已确认，可以开始"
+          : status.label;
+        const countdownProgress = ((3 - Math.max(countdown, 0)) / 3) * 360;
+
+        return (
+          <div className="mx-auto grid max-w-[430px] items-start gap-4 lg:max-w-6xl lg:grid-cols-[0.9fr_1.1fr] lg:gap-8">
+            <div className="order-1 flex flex-col gap-3 lg:order-1 lg:gap-4">
+              <section className="training-card sport-stripe relative overflow-hidden rounded-[28px] p-3 text-white shadow-soft sm:rounded-[32px] sm:p-7">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold text-lime/90">今日推荐</p>
+                    <h1 className="mt-1 text-2xl font-semibold leading-tight text-white sm:mt-3 sm:text-5xl">
+                      {selectedDuration} 分钟新手瑜伽
+                    </h1>
+                  </div>
+                  <span className="rounded-full bg-lime px-3 py-1.5 text-xs font-semibold text-night">
+                    新手友好
+                  </span>
+                </div>
+
+                <p className="mt-3 hidden max-w-md text-sm leading-6 text-white/72 sm:mt-5 sm:block sm:text-base sm:leading-7">
+                  像 Keep 一样直接开始训练，像瑜伽课一样温柔纠正。今天先把身体唤醒，不追求高难度。
+                </p>
+
+                <div className="mt-4 hidden grid-cols-3 gap-2 sm:mt-5 sm:grid">
+                  {[
+                    [selectedFocusMeta.label, "目标"],
+                    [`${selectedDuration} 分`, "时长"],
+                    ["低强度", "难度"],
+                  ].map(([value, label]) => (
+                    <div key={label} className="rounded-[18px] bg-white/10 p-2 backdrop-blur sm:rounded-[22px] sm:p-3">
+                      <p className="text-sm font-semibold text-white sm:text-base">{value}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-white/48">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center sm:mt-5">{[["本地识别", "视频不上云"], ["定制课表", "按状态安排"], ["温和纠错", "不制造压力"]].map(([title, helper]) => (<div key={title} className="rounded-[18px] bg-white/10 px-2 py-2 backdrop-blur"><p className="text-xs font-semibold text-lime/90">{title}</p><p className="mt-1 truncate text-[11px] text-white/48">{helper}</p></div>))}</div>
+
+                <PracticePreferencePanel
+                  selectedFocus={selectedFocus}
+                  setSelectedFocus={setSelectedFocus}
+                  selectedDuration={selectedDuration}
+                  setSelectedDuration={setSelectedDuration}
+                  selectedBodyState={selectedBodyState}
+                  setSelectedBodyState={setSelectedBodyState}
+                  selectedSafety={selectedSafety}
+                  setSelectedSafety={setSelectedSafety}
+                />
+
+                <div className="mt-3 hidden grid-cols-3 gap-2 text-center sm:mt-5 sm:grid">
+                  {[
+                    ["本地识别", "视频不上云"],
+                    ["安全过滤", selectedSafetyMeta?.label || "无明显不适"],
+                    ["低频提醒", "不打断呼吸"],
+                  ].map(([title, helper]) => (
+                    <div key={title} className="rounded-[18px] bg-white/10 px-2 py-2 backdrop-blur">
+                      <p className="text-xs font-semibold text-lime/90">{title}</p>
+                      <p className="mt-1 truncate text-[11px] text-white/48">{helper}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 rounded-[20px] bg-white/10 p-2.5 backdrop-blur sm:mt-7 sm:rounded-[24px] sm:p-4">
+                  <p className="mb-2 text-xs font-semibold text-white/52 sm:mb-3">站位校准</p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div
+                      className={[
+                        "inline-flex max-w-full items-center rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-all duration-500 sm:px-4 sm:py-2 sm:text-sm",
+                        ready
+                          ? "border-lime/30 bg-lime text-night"
+                          : step === 1
+                            ? "border-clay/30 bg-clay/18 text-white"
+                            : "border-white/20 bg-white/10 text-white/70",
+                      ].join(" ")}
+                    >
+                      {statusLabel}
+                    </div>
+                    {ready && (
+                      <div
+                        className="grid h-11 w-11 place-items-center rounded-full p-1 transition-all duration-700"
+                        style={{
+                          background: `conic-gradient(#FFFFFF ${countdownProgress}deg, rgba(255,255,255,0.16) 0deg)`,
+                        }}
+                        aria-label={`${Math.max(countdown, 0)} 秒后可以开始`}
+                      >
+                        <span className="grid h-full w-full place-items-center rounded-full bg-night text-sm font-bold text-lime">
+                          {Math.max(countdown, 0)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="mt-2 line-clamp-1 text-xs leading-5 text-white/62 sm:mt-3 sm:line-clamp-none sm:text-sm sm:leading-6">{status.helper}</p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/14 sm:mt-5">
+                    <div
+                      className="h-full rounded-full bg-lime transition-all duration-700 ease-out"
+                      style={{ width: `${status.progress}%` }}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <button
+                  onClick={onStart}
+                disabled={!ready || loading}
+                className={[
+                  "fixed inset-x-4 bottom-[88px] z-20 flex items-center justify-center gap-2 rounded-[22px] px-6 py-3.5 text-base font-semibold shadow-lifted transition sm:static sm:w-full sm:rounded-2xl sm:py-4",
+                  "focus:outline-none focus:ring-2 focus:ring-sage/35 active:translate-y-[1px]",
+                  ready && !loading
+                    ? "bg-night text-lime shadow-soft hover:bg-[#465BC8]"
+                    : "cursor-not-allowed bg-sand/80 text-forest/42",
+                ].join(" ")}
+              >
+                <Icon type="play" />
+                {loading
+                  ? "正在安排练习..."
+                  : ready
+                    ? `开始 ${selectedDuration} 分钟${selectedFocusMeta.label}`
+                    : "等待站位校准"}
+                </button>
+                <button onClick={onStartDemo} className="hidden items-center justify-center gap-2 rounded-2xl border border-night/12 bg-cream px-5 py-4 text-sm font-semibold text-night shadow-sm transition hover:bg-mist active:translate-y-[1px] sm:inline-flex"><Icon type="play" />演示模式</button>
+              </div>
+              <button onClick={onOpenGuide} className="hidden rounded-[22px] border border-white/80 bg-cream/90 px-4 py-3 text-sm font-semibold text-forest/70 shadow-sm transition hover:bg-white active:translate-y-[1px] sm:inline-flex sm:items-center sm:justify-center sm:gap-2"><Icon type="leaf" />查看新手引导</button>
+              <div className="grid grid-cols-2 gap-2 sm:hidden"><button onClick={onStartDemo} className="rounded-[22px] border border-night/12 bg-cream px-4 py-3.5 text-sm font-semibold text-night shadow-lifted transition active:translate-y-[1px]">演示模式</button><button onClick={onOpenGuide} className="rounded-[22px] bg-cream px-4 py-3.5 text-sm font-semibold text-forest/70 shadow-lifted transition active:translate-y-[1px]">引导</button></div>
+              <div className="h-20 sm:hidden" aria-hidden="true" />
+
+              <div className="hidden rounded-[24px] border border-white/80 bg-cream/86 p-4 text-sm leading-6 text-forest/64 shadow-sm sm:block">
+                本次会优先照顾你的{selectedFocusMeta.requestText}，身体状态按“
+                {selectedBodyStateMeta.label}”处理，安全边界为“{selectedSafetyMeta?.label || "无明显不适"}”。动作会更慢，提醒也会少一点。
+              </div>
+            </div>
+
+            <div className="order-2 hidden lg:block lg:order-2">
+              <CameraFrame label="站位预览" status={ready ? "已准备" : "校准中"}>
+                <AlignmentSilhouette ready={ready} />
+              </CameraFrame>
+            </div>
+          </div>
+        );
+      }
+
+      function PracticeView({
+        formError,
+        setFormError,
+        paused,
+        setPaused,
+        muted,
+        setMuted,
+        cameraMode,
+        setCameraMode,
+        secondsLeft,
+        currentPose = FALLBACK_COURSE.poses[0],
+        poseIndex = 0,
+        poseCount = 1,
+        courseInsight,
+        errorCounts,
+        hasNextPose,
+        onFormErrorConfirmed,
+        onSummary,
+        onExit,
+        demoMode = false,
+      }) {
+        const videoRef = useRef(null);
+        const canvasRef = useRef(null);
+        const streamRef = useRef(null);
+        const poseRef = useRef(null);
+        const frameRef = useRef(null);
+        const pausedRef = useRef(paused);
+        const formErrorRef = useRef(formError);
+        const currentPoseRef = useRef(currentPose);
+        const deviationStartedAtRef = useRef(null);
+        const lastPoseUiUpdateRef = useRef(0);
+        const poseHealthRef = useRef({ noPoseSince: null, lastHintAt: 0, lastSendErrorAt: 0 });
+        const errorEpisodeReportedRef = useRef(false);
+        const [useMock, setUseMock] = useState(demoMode);
+        const [mobileDemoOpen, setMobileDemoOpen] = useState(false);
+        const [readingMode, setReadingMode] = useState("normal");
+        const [trackingQuality, setTrackingQuality] = useState("no_pose");
+        const [poseMismatchState, setPoseMismatchState] = useState(null);
+        const [mockSignal, setMockSignal] = useState(false);
+        const [cameraState, setCameraState] = useState("idle");
+        const [cameraIssue, setCameraIssue] = useState("");
+        const [permissionDialogOpen, setPermissionDialogOpen] = useState(false);
+        const [pendingCorrection, setPendingCorrection] = useState(false);
+        const [debounceProgress, setDebounceProgress] = useState(0);
+        const [poseMeta, setPoseMeta] = useState({
+          angle: null,
+          visibleCount: 0,
+          label: "等待识别",
+          tip: null,
+          framing: null,
+        });
+        const [speaking, setSpeaking] = useState(false);
+        const [voiceFrame, setVoiceFrame] = useState(0);
+        const lastSpokenAtRef = useRef({});
+        const speakingRef = useRef(false);
+        const speechTimerRef = useRef(null);
+        const [voiceReady, setVoiceReady] = useState(false);
+        const [voiceNotice, setVoiceNotice] = useState("");
+        const timeLabel = formatTimer(secondsLeft);
+        const poseDuration = Math.max(1, currentPose?.duration_sec || 60);
+        const progress = Math.max(8, ((poseDuration - secondsLeft) / poseDuration) * 100);
+        const correctionTip =
+          poseMeta.tip ||
+          currentPose?.guidance_tip ||
+          "请注意向下沉肩，拉伸脊柱。先把动作放小，再慢慢找回呼吸。";
+        const targetMin = currentPose?.target_angle_min ?? 140;
+        const targetMax = currentPose?.target_angle_max ?? 180;
+        const cameraRequirement = getCameraModeMeta(
+          currentPose?.camera_mode_required || "half_body"
+        );
+        const isFarReadingMode = readingMode === "far";
+        const statusLabel = useMock
+          ? "离线体验模式"
+          : cameraState === "ready"
+            ? `${cameraRequirement.short} · ${poseMeta.visibleCount}/33`
+            : cameraState === "requesting"
+              ? "正在请求摄像头"
+              : "准备摄像头";
+        const coachTip = poseMismatchState?.mismatched
+          ? poseMismatchState.tip
+          : formError
+            ? correctionTip
+            : pendingCorrection
+              ? "我看到身体有一点点晃动，先不用急着调整，跟着呼吸慢下来。"
+              : currentPose?.guidance_tip || "跟着呼吸慢慢来，动作小一点也可以。";
+        const trackingQualityMeta = getTrackingQualityMeta(trackingQuality);
+        const angleLabel = Number.isFinite(poseMeta.angle)
+          ? `${poseMeta.label} ${poseMeta.angle}°`
+          : poseMeta.label;
+
+        const speakText = (text, { bypassThrottle = false } = {}) => {
+          if (muted && !bypassThrottle) return false;
+          if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+            setVoiceNotice("当前浏览器不支持语音播报，可继续使用文字提醒。");
+            return false;
+          }
+
+          const now = Date.now();
+          const lastSpokenAt = lastSpokenAtRef.current[text] || 0;
+          if (!bypassThrottle && (speakingRef.current || now - lastSpokenAt < TTS_THROTTLE_MS)) {
+            return false;
+          }
+
+          lastSpokenAtRef.current[text] = now;
+          speakingRef.current = true;
+          setSpeaking(true);
+          setVoiceReady(true);
+          setVoiceNotice("语音提醒已开启");
+
+          const finishSpeaking = () => {
+            speakingRef.current = false;
+            setSpeaking(false);
+          };
+
+          window.speechSynthesis.cancel();
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = "zh-CN";
+          utterance.rate = 0.88;
+          utterance.pitch = 1;
+          utterance.volume = 0.78;
+          utterance.onend = finishSpeaking;
+          utterance.onerror = () => {
+            setVoiceNotice("语音播报被浏览器拦截，请再点一次语音试播。");
+            finishSpeaking();
+          };
+          window.speechSynthesis.speak(utterance);
+
+          if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
+          speechTimerRef.current = window.setTimeout(finishSpeaking, 3800);
+          return true;
+        };
+
+        const handleVoiceButtonClick = () => {
+          if (muted) {
+            setMuted(false);
+            window.setTimeout(() => speakText("语音提醒已开启，我会在需要时轻声提示你。", { bypassThrottle: true }), 0);
+            return;
+          }
+
+          if (!voiceReady) {
+            speakText("语音提醒已开启，我会在需要时轻声提示你。", { bypassThrottle: true });
+            return;
+          }
+
+          setMuted(true);
+          setVoiceNotice("语音提醒已关闭");
+          if (window.speechSynthesis) window.speechSynthesis.cancel();
+          setSpeaking(false);
+          speakingRef.current = false;
+        };
+
+        useEffect(() => { pausedRef.current = paused; }, [paused]);
+        useEffect(() => { if (demoMode) { setUseMock(true); setTrackingQuality("stable"); } }, [demoMode]);
+
+        useEffect(() => {
+          formErrorRef.current = formError;
+        }, [formError]);
+
+        const resetPoseFeedback = () => {
+          deviationStartedAtRef.current = null;
+          errorEpisodeReportedRef.current = false;
+          setPendingCorrection(false);
+          setDebounceProgress(0);
+          if (formErrorRef.current) {
+            formErrorRef.current = false;
+            setFormError(false);
+          }
+        };
+
+        const updateFormError = (nextValue) => {
+          if (formErrorRef.current === nextValue) return;
+          formErrorRef.current = nextValue;
+          setFormError(nextValue);
+        };
+
+        useEffect(() => {
+          currentPoseRef.current = currentPose;
+          setMobileDemoOpen(true);
+          setPaused(true);
+          resetPoseFeedback();
+          const timer = window.setTimeout(() => {
+            setMobileDemoOpen(false);
+            setPaused(false);
+          }, 3200);
+          return () => window.clearTimeout(timer);
+        }, [currentPose?.pose_id]);
+
+        const processPoseResult = (analysis) => {
+          const now = performance.now();
+          const shouldRefreshUi = now - lastPoseUiUpdateRef.current > 140;
+
+          if (shouldRefreshUi) {
+            lastPoseUiUpdateRef.current = now;
+            setPoseMeta({ angle: analysis.angle, visibleCount: analysis.visibleCount, label: analysis.label, tip: analysis.tip || null, framing: analysis.framing || null });
+            setTrackingQuality(analysis.quality || (analysis.visibleCount >= 18 ? "stable" : analysis.visibleCount > 0 ? "partial_body" : "no_pose"));
+            setReadingMode(analysis.framing?.isFar ? "far" : "normal");
+            setPoseMismatchState(analysis.mismatch || null);
+          }
+
+          if (!analysis.hasDeviation || pausedRef.current) {
+            resetPoseFeedback();
+            return [];
+          }
+
+          if (!deviationStartedAtRef.current) {
+            deviationStartedAtRef.current = now;
+          }
+
+          const elapsed = now - deviationStartedAtRef.current;
+          const nextProgress = Math.min(100, Math.round((elapsed / POSE_DEBOUNCE_MS) * 100));
+          if (shouldRefreshUi) {
+            setPendingCorrection(elapsed < POSE_DEBOUNCE_MS);
+            setDebounceProgress(nextProgress);
+          }
+
+          if (elapsed >= POSE_DEBOUNCE_MS) {
+            setPendingCorrection(false);
+            updateFormError(true);
+            if (!errorEpisodeReportedRef.current) {
+              errorEpisodeReportedRef.current = true;
+              onFormErrorConfirmed?.(
+                currentPoseRef.current?.correction_error_key || "shoulder_high"
+              );
+            }
+            return analysis.errorIndices;
+          }
+
+          updateFormError(false);
+          return [];
+        };
+
+        useEffect(() => {
+          if (useMock) return;
+
+          let cancelled = false;
+
+          const stopCamera = () => {
+            if (frameRef.current) window.cancelAnimationFrame(frameRef.current);
+            frameRef.current = null;
+
+            if (poseRef.current?.close) {
+              poseRef.current.close();
+            }
+            poseRef.current = null;
+
+            if (streamRef.current) {
+              streamRef.current.getTracks().forEach((track) => track.stop());
+            }
+            streamRef.current = null;
+
+            const canvas = canvasRef.current;
+            if (canvas) {
+              const context = canvas.getContext("2d");
+              context.clearRect(0, 0, canvas.width, canvas.height);
+            }
+          };
+
+          const startCamera = async () => {
+            resetPoseFeedback();
+            setCameraIssue("");
+            setCameraState("requesting");
+
+            if (!navigator.mediaDevices?.getUserMedia) {
+              setCameraIssue("当前浏览器环境无法访问摄像头。请使用 HTTPS 手机链接，或先进入离线体验模式。");
+              setCameraState("fallback");
+              setPermissionDialogOpen(true);
+              setUseMock(true);
+              return;
+            }
+
+            if (!window.Pose) {
+              setCameraIssue("姿态识别脚本没有加载成功。请检查网络后重试，或先进入离线体验模式。");
+              setCameraState("fallback");
+              setPermissionDialogOpen(true);
+              setUseMock(true);
+              return;
+            }
+
+            try {
+              const constraints =
+                cameraMode === "front"
+                  ? { video: true }
+                  : {
+                      video: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                      },
+                      audio: false,
+                    };
+              const stream = await navigator.mediaDevices.getUserMedia(constraints);
+              if (cancelled) {
+                stream.getTracks().forEach((track) => track.stop());
+                return;
+              }
+
+              streamRef.current = stream;
+              const video = videoRef.current;
+              if (!video) {
+                throw new Error("Video element is not ready.");
+              }
+              video.srcObject = stream;
+              await video.play();
+
+              const pose = new window.Pose({
+                locateFile: (file) =>
+                  `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`,
+              });
+              pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5,
+                selfieMode: cameraMode === "front",
+              });
+              pose.onResults((results) => {
+                if (cancelled) return;
+                const landmarks = results.poseLandmarks || [];
+                const reliableCount = countReliableLandmarks(landmarks);
+                const health = poseHealthRef.current;
+                const now = performance.now();
+
+                if (reliableCount > 0) {
+                  health.noPoseSince = null;
+                  setCameraIssue("");
+                } else {
+                  if (!health.noPoseSince) health.noPoseSince = now;
+                  if (now - health.noPoseSince > 1600 && now - health.lastHintAt > 1400) {
+                    health.lastHintAt = now;
+                    setCameraIssue("还没捕捉到身体关键点，请退后一点，并让头部和肩膀进入画面。");
+                  }
+                }
+
+                const latestPose = currentPoseRef.current || currentPose;
+                const analysis = evaluatePoseDeviation(landmarks, latestPose);
+                const activeErrorIndices = processPoseResult(analysis);
+                drawPoseCanvas(canvasRef.current, videoRef.current, landmarks, {
+                  mirrored: cameraMode === "front",
+                  errorIndices: activeErrorIndices,
+                });
+              });
+              poseRef.current = pose;
+              setCameraState("ready");
+              setPermissionDialogOpen(false);
+
+              const detectFrame = async () => {
+                if (cancelled || !poseRef.current) return;
+                if (!pausedRef.current && video.readyState >= 2) {
+                  try {
+                    await poseRef.current.send({ image: video });
+                  } catch (sendError) {
+                    const health = poseHealthRef.current;
+                    const now = performance.now();
+                    if (now - health.lastSendErrorAt > 2200) {
+                      health.lastSendErrorAt = now;
+                      setCameraIssue("姿态识别模型正在加载或网络资源较慢，请稍等；若一直没有节点，可切换离线体验。");
+                    }
+                  }
+                }
+                frameRef.current = window.requestAnimationFrame(detectFrame);
+              };
+              detectFrame();
+            } catch (error) {
+              if (cancelled) return;
+              setCameraIssue("需要摄像头权限以开启实时 AI 姿势指导。已为你切换到离线体验模式，可稍后重试摄像头。");
+              setCameraState("fallback");
+              setPermissionDialogOpen(true);
+              setUseMock(true);
+            }
+          };
+
+          startCamera();
+
+          return () => {
+            cancelled = true;
+            stopCamera();
+          };
+        }, [cameraMode, useMock]);
+
+        useEffect(() => {
+          if (!useMock) return;
+          setCameraState("mock");
+          setPoseMeta({
+            angle: mockSignal ? 126 : 164,
+            visibleCount: 33,
+            label: "模拟脊柱线",
+            tip: null,
+            framing: {
+              isFar: currentPoseRef.current?.camera_mode_required === "full_body",
+              label: "远距离大字模式",
+              helper: "你站得比较远，我会放大关键提示，主要听语音即可。",
+            },
+          });
+
+          if (!mockSignal) {
+            resetPoseFeedback();
+            return;
+          }
+
+          deviationStartedAtRef.current = performance.now();
+          setPendingCorrection(true);
+          setDebounceProgress(0);
+          updateFormError(false);
+
+          const interval = window.setInterval(() => {
+            const elapsed = performance.now() - deviationStartedAtRef.current;
+            const nextProgress = Math.min(100, Math.round((elapsed / POSE_DEBOUNCE_MS) * 100));
+            setDebounceProgress(nextProgress);
+
+            if (elapsed >= POSE_DEBOUNCE_MS) {
+              setPendingCorrection(false);
+              updateFormError(true);
+              if (!errorEpisodeReportedRef.current) {
+                errorEpisodeReportedRef.current = true;
+                onFormErrorConfirmed?.(
+                  currentPoseRef.current?.correction_error_key || "shoulder_high"
+                );
+              }
+            }
+          }, CV_FRAME_INTERVAL_MS);
+
+          return () => window.clearInterval(interval);
+        }, [useMock, mockSignal, setFormError]);
+
+        useEffect(() => {
+          if (!formError || muted) {
+            setSpeaking(false);
+            speakingRef.current = false;
+            if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
+            if (window.speechSynthesis) window.speechSynthesis.cancel();
+            return;
+          }
+
+          const trySpeak = () => {
+            speakText(correctionTip);
+          };
+
+          trySpeak();
+          const interval = window.setInterval(trySpeak, 1000);
+          return () => {
+            window.clearInterval(interval);
+            if (speechTimerRef.current) window.clearTimeout(speechTimerRef.current);
+            if (window.speechSynthesis) window.speechSynthesis.cancel();
+          };
+        }, [formError, muted, correctionTip]);
+
+        useEffect(() => {
+          if (!speaking) return;
+          const interval = window.setInterval(() => {
+            setVoiceFrame((value) => (value + 1) % 8);
+          }, 180);
+          return () => window.clearInterval(interval);
+        }, [speaking]);
+
+        return (
+          <div className="mx-auto flex max-w-[430px] flex-col gap-3 lg:max-w-6xl lg:gap-4">
+            {permissionDialogOpen && (
+              <div className="fixed inset-0 z-30 flex items-center justify-center bg-forest/20 px-4 py-6 backdrop-blur-sm">
+                <section className="w-full max-w-sm rounded-2xl border border-white/80 bg-cream p-5 shadow-soft">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FFF3EB] text-clay">
+                    <Icon type="camera" />
+                  </div>
+                  <h3 className="mt-4 text-xl font-semibold text-forest">
+                    需要摄像头权限以开启 AI 指导
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-forest/66">
+                    没关系，我已经为你切到离线体验模式。你可以先看完整流程，也可以稍后重新授权摄像头。
+                  </p>
+                  <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                    <button
+                      onClick={() => setPermissionDialogOpen(false)}
+                      className="rounded-xl bg-sage px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#657BEA] active:translate-y-[1px]"
+                    >
+                      继续演示
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPermissionDialogOpen(false);
+                        setCameraIssue("");
+                        setMockSignal(false);
+                        setUseMock(false);
+                        resetPoseFeedback();
+                      }}
+                      className="rounded-xl border border-sand bg-cream px-4 py-3 text-sm font-semibold text-forest transition hover:bg-sand/45 active:translate-y-[1px]"
+                    >
+                      重试摄像头
+                    </button>
+                  </div>
+                </section>
+              </div>
+            )}
+            <section className="training-card relative overflow-hidden rounded-[28px] p-3.5 text-white shadow-soft sm:rounded-[32px] sm:p-5">
+              {isFarReadingMode && (<FarReadingHero pose={currentPose} timeLabel={timeLabel} message={coachTip} trackingQualityMeta={trackingQualityMeta} speaking={speaking && !muted} />)}
+              {cameraIssue && (
+                <div className="mb-4 flex flex-col gap-3 rounded-[24px] border border-clay/25 bg-clay/12 p-4 text-sm text-white/72 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-white">需要摄像头权限以开启实时指导</p>
+                    <p className="mt-1 leading-6">{cameraIssue}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setUseMock((value) => !value);
+                      setMockSignal(false);
+                      setCameraIssue("");
+                      setPermissionDialogOpen(false);
+                    }}
+                    className="shrink-0 rounded-[18px] bg-lime px-4 py-2 font-semibold text-night shadow-sm transition hover:bg-[#FFEBA0] active:translate-y-[1px]"
+                  >
+                    {useMock ? "重试摄像头" : "进入离线体验"}
+                  </button>
+                </div>
+              )}
+              <div className="flex items-start justify-between gap-3 md:items-center">
+                <div>
+                  <p className="text-sm font-semibold text-lime/90">
+                    正在训练 · 第 {poseIndex + 1} / {poseCount} 个动作
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold leading-tight text-white sm:text-4xl">
+                    {currentPose?.pose_name || "猫牛式"}
+                  </h2>
+                  <p className="mt-1 line-clamp-1 max-w-[230px] text-xs leading-5 text-white/58 sm:max-w-xl sm:text-sm">
+                    {courseInsight || "今天先求舒服和稳定，不追求动作幅度。"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
+                  <span className="rounded-full bg-lime px-3 py-1.5 text-base font-semibold tabular-nums text-night sm:px-4 sm:py-2 sm:text-lg">
+                    {timeLabel}
+                  </span>
+                  <button
+                    onClick={() => setPaused((value) => !value)}
+                    className="inline-flex items-center gap-1.5 rounded-[18px] bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white/16 active:translate-y-[1px] sm:gap-2 sm:px-4 sm:py-2"
+                  >
+                    <Icon type={paused ? "play" : "pause"} />
+                    {paused ? "继续" : "暂停"}
+                  </button>
+                  <button
+                    onClick={onExit}
+                    className="hidden items-center gap-2 rounded-[18px] border border-white/12 bg-white/8 px-4 py-2 text-sm font-semibold text-white/82 transition hover:bg-white/14 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime/35 sm:inline-flex"
+                  >
+                    <Icon type="home" />
+                    退出练习
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/12 sm:mt-5">
+                <div
+                  className="h-full rounded-full bg-lime transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </section>
+
+            <div className="hidden lg:block">
+              <CourseInsightCard insight={courseInsight} />
+            </div>
+
+            <MobileDemoDock pose={currentPose} expanded={mobileDemoOpen && !isFarReadingMode} compact={isFarReadingMode} onToggle={() => setMobileDemoOpen((value) => !value)} />
+
+            <section className="grid gap-3 lg:grid-cols-[minmax(280px,0.4fr)_minmax(0,0.6fr)] lg:gap-4">
+              <div className="hidden lg:block">
+                <DemoPoseCard pose={currentPose} />
+              </div>
+
+              <div className="order-1 relative overflow-hidden rounded-[32px] border border-night/10 bg-night p-3 shadow-soft shadow-inset sm:p-4 lg:order-2">
+                <div className="camera-surface relative h-[51dvh] min-h-[360px] max-h-[480px] overflow-hidden rounded-[26px] sm:h-[54dvh] sm:min-h-[520px] sm:max-h-[560px] lg:h-auto lg:min-h-[650px] lg:max-h-none">
+                <div className="mat-perspective absolute bottom-10 left-1/2 h-[300px] w-[260px] -translate-x-1/2 rounded-[36px] bg-sage/10" />
+                {useMock ? (
+                  <SkeletonOverlay formError={formError} />
+                ) : (
+                  <>
+                    <video
+                      ref={videoRef}
+                      className="absolute inset-0 h-full w-full object-cover opacity-90"
+                      style={{ transform: cameraMode === "front" ? "scaleX(-1)" : "none" }}
+                      playsInline
+                      muted
+                      autoPlay
+                    />
+                    <canvas
+                      ref={canvasRef}
+                      className="absolute inset-0 h-full w-full"
+                      aria-label="MediaPipe Pose 实时骨骼关键点"
+                    />
+                    {cameraState !== "ready" && (
+                      <div className="absolute inset-0 grid place-items-center bg-linen/48 backdrop-blur-[2px]">
+                        <div className="rounded-[24px] bg-cream/90 px-5 py-4 text-center shadow-sm">
+                          <p className="text-sm font-semibold text-sage">正在准备实时姿态识别</p>
+                          <p className="mt-2 text-sm text-forest/62">请允许浏览器使用摄像头。</p>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="absolute left-4 top-4 rounded-full border border-white/16 bg-night/58 px-3 py-1.5 text-xs font-semibold text-white/78 shadow-sm backdrop-blur-md">{statusLabel}</div>
+                <div className={["absolute left-4 right-4 top-14 max-w-[calc(100%-2rem)] rounded-[18px] px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md sm:right-auto sm:max-w-[360px]", trackingQualityMeta.tone].join(" ")}><span>{trackingQualityMeta.label}</span>{trackingQuality !== "stable" && (<span className="ml-2 font-medium opacity-72">{trackingQualityMeta.helper}</span>)}</div>
+
+                <div className="absolute right-4 top-4 flex max-w-[190px] flex-col items-end gap-2">
+                  <button
+                    onClick={() => {
+                      setUseMock((value) => !value);
+                      setMockSignal(false);
+                      setCameraIssue("");
+                      setPermissionDialogOpen(false);
+                      resetPoseFeedback();
+                    }}
+                    className="rounded-[18px] bg-white/88 px-4 py-2 text-sm font-semibold text-forest shadow-sm transition hover:bg-cream active:translate-y-[1px]"
+                  >
+                    {useMock ? "重试摄像头" : DEBUG_MODE ? "Mock 测试" : "离线体验"}
+                  </button>
+                  {useMock && DEBUG_MODE && (
+                    <button
+                      onClick={() => setMockSignal((value) => !value)}
+                      className={[
+                        "rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition active:translate-y-[1px]",
+                        mockSignal
+                          ? "bg-clay text-white hover:bg-[#DF7E58]"
+                          : "bg-white/88 text-forest hover:bg-cream",
+                      ].join(" ")}
+                    >
+                      {mockSignal ? "恢复自然状态" : "模拟身体提醒"}
+                    </button>
+                  )}
+                </div>
+
+                {(pendingCorrection || formError) && (
+                  <div className="absolute right-4 top-16 overflow-hidden rounded-full border border-white/16 bg-night/64 px-3 py-1.5 text-xs font-semibold text-white/76 shadow-sm backdrop-blur-md">
+                    <span className="relative z-[1]">
+                      {formError ? "可以再放松一点" : "我再观察一下"}
+                    </span>
+                    <span
+                      className="absolute inset-y-0 left-0 bg-lime/22 transition-all duration-200"
+                      style={{ width: `${formError ? 100 : debounceProgress}%` }}
+                    />
+                  </div>
+                )}
+
+                <div className="absolute left-4 top-24 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md">{angleLabel}</div>
+                {cameraIssue && cameraState === "ready" && !useMock && (
+                  <div className="absolute inset-x-4 top-[136px] rounded-[18px] border border-white/18 bg-white/88 px-4 py-3 text-xs font-semibold leading-relaxed text-forest/76 shadow-sm backdrop-blur-md">
+                    {cameraIssue}
+                  </div>
+                )}
+                <div
+                  className={[
+                    "absolute left-4 rounded-full border border-white/16 bg-night/50 px-3 py-1.5 text-xs font-semibold text-white/62 shadow-sm backdrop-blur-md transition-all",
+                    cameraIssue && cameraState === "ready" && !useMock ? "top-[206px]" : "top-[136px]",
+                  ].join(" ")}
+                >
+                  温柔提醒 {Object.values(errorCounts || {}).reduce((sum, value) => sum + value, 0)} 次
+                </div>
+
+                </div>
+
+                <PracticeTipPanel
+                  formError={formError || Boolean(poseMismatchState?.mismatched)}
+                  pendingCorrection={pendingCorrection}
+                  coachTip={coachTip}
+                  className="hidden sm:block"
+                />
+
+                <CoachCompanion
+                  speaking={speaking && !muted}
+                  formError={formError || Boolean(poseMismatchState?.mismatched)}
+                  pendingCorrection={pendingCorrection}
+                  message={coachTip}
+                  frame={voiceFrame}
+                  voiceNotice={voiceNotice}
+                />
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <ControlButton
+                    icon="voice"
+                    label={muted ? "打开语音" : voiceReady ? "关闭语音" : "语音试播"}
+                    onClick={handleVoiceButtonClick}
+                  />
+                  <ControlButton
+                    icon="camera"
+                    label={cameraMode === "front" ? "切到后置" : "切到前置"}
+                    onClick={() =>
+                      setCameraMode((value) => (value === "front" ? "back" : "front"))
+                    }
+                  />
+                  <ControlButton
+                    icon="skip"
+                    label={hasNextPose ? "下一体式" : "完成跟练"}
+                    onClick={onSummary}
+                  />
+                </div>
+              </div>
+            </section>
+          </div>
+        );
+      }
+
+      function SummaryView({
+        sessionSummary,
+        nextPractice,
+        practiceStreak,
+        sessionStats,
+        onPoster,
+        onBackHome,
+      }) {
+        const summary = sessionSummary || FALLBACK_SESSION_SUMMARY;
+        const sessionMetrics = buildSessionMetrics(sessionStats);
+
+        return (
+          <div className="mx-auto grid max-w-[430px] gap-5 lg:max-w-6xl lg:grid-cols-[0.94fr_1.06fr]">
+            <div className="flex flex-col gap-4">
+              <section className="training-card sport-stripe relative overflow-hidden rounded-[32px] p-6 text-white shadow-soft sm:p-8">
+                <p className="text-sm font-semibold text-lime/90">练习完成</p>
+                <h2 className="mt-3 text-3xl font-semibold leading-tight text-white sm:text-4xl">
+                  {summary.summary_title}
+                </h2>
+                <p className="mt-4 max-w-md text-base leading-7 text-white/72">
+                  {summary.ai_feedback}
+                </p>
+                <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-lime px-4 py-2 text-sm font-semibold text-night">
+                  <Icon type="sparkle" className="h-4 w-4" />
+                  {summary.badge_awarded}
+                </div>
+              </section>
+
+              <section className="grid gap-3 sm:grid-cols-2">
+                <article className="rounded-[28px] border border-white/80 bg-cream p-5 shadow-sm">
+                  <p className="text-sm font-semibold text-sage">连续练习</p>
+                  <p className="mt-2 text-3xl font-semibold text-forest">
+                    {Math.max(1, practiceStreak || 1)} 天
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-forest/58">
+                    今天已经记入你的轻练习记录。
+                  </p>
+                </article>
+                <article className="rounded-[28px] border border-white/80 bg-cream p-5 shadow-sm">
+                  <p className="text-sm font-semibold text-sage">下次建议</p>
+                  <p className="mt-2 text-sm leading-6 text-forest/70">
+                    {nextPractice || "下次可以继续做 8 分钟肩颈舒缓，保持今天这种不着急的节奏。"}
+                  </p>
+                </article>
+              </section>
+
+              <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                {sessionMetrics.map((metric) => (
+                  <article
+                    key={metric.label}
+                    className="rounded-[28px] border border-white/80 bg-cream p-5 shadow-sm"
+                  >
+                    <p className="text-sm text-forest/58">{metric.label}</p>
+                    <p className="mt-2 text-2xl font-semibold text-forest">{metric.value}</p>
+                    <p className="mt-2 text-xs font-semibold text-sage">{metric.note}</p>
+                  </article>
+                ))}
+              </section>
+
+              <section className="rounded-[28px] border border-white/80 bg-cream p-5 shadow-sm">
+                <p className="text-sm font-semibold text-sage">本次徽章</p>
+                <p className="mt-3 text-base leading-7 text-forest/72">
+                  {summary.badge_awarded}
+                </p>
+              </section>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={onPoster}
+                  className="inline-flex items-center justify-center gap-2 rounded-[24px] bg-night px-5 py-4 text-base font-semibold text-lime shadow-soft transition hover:bg-[#465BC8] active:translate-y-[1px]"
+                >
+                  <Icon type="share" />
+                  生成分享卡
+                </button>
+                <button
+                  onClick={onBackHome}
+                  className="inline-flex items-center justify-center gap-2 rounded-[24px] border border-sand bg-cream px-5 py-4 text-base font-semibold text-forest transition hover:bg-sand/45 active:translate-y-[1px]"
+                >
+                  <Icon type="home" />
+                  回到首页
+                </button>
+              </div>
+            </div>
+
+            <section className="rounded-[32px] border border-white/80 bg-cream p-4 shadow-soft">
+              <div className="mb-4 flex items-center justify-between gap-3 px-1">
+                <div>
+                  <p className="text-sm font-semibold text-sage">今日高光体式</p>
+                  <h3 className="mt-1 text-xl font-semibold text-forest">脊柱伸展更自然</h3>
+                </div>
+                <span className="rounded-full bg-mist px-3 py-1 text-xs font-semibold text-sage">
+                  已保存
+                </span>
+              </div>
+              <div className="camera-surface relative min-h-[430px] overflow-hidden rounded-[26px] lg:min-h-[560px]">
+                <div className="mat-perspective absolute bottom-10 left-1/2 h-[300px] w-[260px] -translate-x-1/2 rounded-[36px] bg-sage/10" />
+                <SkeletonOverlay compact />
+              </div>
+            </section>
+          </div>
+        );
+      }
+
+      function CameraFrame({ children, label, status }) {
+        return (
+          <section className="rounded-[26px] border border-white/80 bg-cream p-3 shadow-soft shadow-inset sm:rounded-2xl sm:p-4">
+            <div className="camera-surface relative min-h-[260px] overflow-hidden rounded-[22px] sm:min-h-[420px] sm:rounded-2xl lg:min-h-[660px]">
+              <div className="mat-perspective absolute bottom-10 left-1/2 h-[300px] w-[260px] -translate-x-1/2 rounded-[36px] bg-sage/10" />
+              <div className="absolute left-4 top-4 rounded-full border border-white/75 bg-cream/82 px-3 py-1.5 text-xs font-semibold text-forest/72 shadow-sm backdrop-blur-md">
+                {label}
+              </div>
+              <div className="absolute right-4 top-4 rounded-full bg-cream/84 px-3 py-1.5 text-xs font-semibold text-sage shadow-sm backdrop-blur-md">
+                {status}
+              </div>
+              {children}
+            </div>
+          </section>
+        );
+      }
+
+      function AlignmentSilhouette({ ready }) {
+        return (
+          <svg
+            className="absolute inset-0 h-full w-full"
+            viewBox="0 0 420 620"
+            role="img"
+            aria-label="站位轮廓引导"
+          >
+            <defs>
+              <filter id="softShadow">
+                <feDropShadow dx="0" dy="12" stdDeviation="12" floodColor="#6AC4BE" floodOpacity="0.12" />
+              </filter>
+            </defs>
+            <ellipse cx="210" cy="552" rx="118" ry="20" fill="#6AC4BE" opacity="0.08" />
+            {ready && (
+              <g className="animate-breathe" fill="none" stroke="#6AC4BE" strokeLinecap="round">
+                <ellipse cx="210" cy="316" rx="148" ry="246" strokeWidth="2" opacity="0.14" />
+                <ellipse cx="210" cy="316" rx="122" ry="210" strokeWidth="2.6" opacity="0.18" />
+                <ellipse cx="210" cy="316" rx="96" ry="174" strokeWidth="3" opacity="0.12" />
+              </g>
+            )}
+            <g
+              filter="url(#softShadow)"
+              fill="none"
+              stroke={ready ? "#6AC4BE" : "#8EA596"}
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray="2 16"
+              className={ready ? "animate-breathe" : ""}
+            >
+              <circle cx="210" cy="104" r="42" />
+              <path d="M210 150 C210 204 208 247 207 292" />
+              <path d="M160 196 C184 178 236 178 260 196" />
+              <path d="M160 196 C129 244 112 284 97 328" />
+              <path d="M260 196 C291 244 308 284 323 328" />
+              <path d="M207 292 C176 340 153 402 132 500" />
+              <path d="M207 292 C242 342 267 404 288 500" />
+            </g>
+            <g fill={ready ? "#6AC4BE" : "#FFFFFF"} stroke="#6AC4BE" strokeWidth="3">
+              {[104, 196, 292, 500].map((y, index) => (
+                <circle key={`center-${index}`} cx="210" cy={y} r="8" />
+              ))}
+              <circle cx="160" cy="196" r="8" />
+              <circle cx="260" cy="196" r="8" />
+              <circle cx="97" cy="328" r="8" />
+              <circle cx="323" cy="328" r="8" />
+              <circle cx="132" cy="500" r="8" />
+              <circle cx="288" cy="500" r="8" />
+            </g>
+            <path
+              d="M92 112 C92 68 126 42 170 42"
+              fill="none"
+              stroke="#DCE6F8"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+            <path
+              d="M328 112 C328 68 294 42 250 42"
+              fill="none"
+              stroke="#DCE6F8"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+        );
+      }
+
+      function SkeletonOverlay({ formError = false, compact = false }) {
+        const points = useMemo(
+          () => ({
+            head: [210, 92],
+            neck: [210, 148],
+            shoulderL: [154, 186],
+            shoulderR: formError ? [278, 207] : [266, 186],
+            elbowL: [130, 262],
+            elbowR: [298, 262],
+            handL: [116, 334],
+            handR: [312, 334],
+            hipL: [172, 318],
+            hipR: [248, 318],
+            kneeL: [156, 414],
+            kneeR: formError ? [273, 430] : [264, 414],
+            ankleL: [142, 512],
+            ankleR: [286, 512],
+          }),
+          [formError]
+        );
+
+        const lines = [
+          ["head", "neck"],
+          ["neck", "shoulderL"],
+          ["neck", "shoulderR"],
+          ["shoulderL", "elbowL"],
+          ["elbowL", "handL"],
+          ["shoulderR", "elbowR"],
+          ["elbowR", "handR"],
+          ["neck", "hipL"],
+          ["neck", "hipR"],
+          ["hipL", "hipR"],
+          ["hipL", "kneeL"],
+          ["kneeL", "ankleL"],
+          ["hipR", "kneeR"],
+          ["kneeR", "ankleR"],
+        ];
+
+        const problemPoints = new Set(["shoulderR", "kneeR"]);
+
+        return (
+          <svg
+            className={compact ? "absolute inset-0 h-full w-full animate-float" : "absolute inset-0 h-full w-full"}
+            viewBox="0 0 420 620"
+            role="img"
+            aria-label="姿态骨架识别示意"
+          >
+            <defs>
+              <filter id="nodeGlow" x="-60%" y="-60%" width="220%" height="220%">
+                <feGaussianBlur stdDeviation="2.8" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="errorGlow" x="-80%" y="-80%" width="260%" height="260%">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <ellipse cx="210" cy="552" rx="130" ry="21" fill="#6AC4BE" opacity="0.08" />
+            <g fill="none" strokeLinecap="round" strokeLinejoin="round">
+              {lines.map(([from, to]) => {
+                const a = points[from];
+                const b = points[to];
+                const isProblem = formError && (problemPoints.has(from) || problemPoints.has(to));
+                return (
+                  <line
+                    key={`${from}-${to}`}
+                    x1={a[0]}
+                    y1={a[1]}
+                    x2={b[0]}
+                    y2={b[1]}
+                    stroke={isProblem ? "#F39A72" : "#6AC4BE"}
+                    strokeWidth={isProblem ? "3.6" : "2.1"}
+                    opacity={isProblem ? "0.82" : "0.48"}
+                    filter={isProblem ? "url(#errorGlow)" : "url(#nodeGlow)"}
+                  />
+                );
+              })}
+            </g>
+            {Object.entries(points).map(([name, [x, y]]) => {
+              const isProblem = formError && problemPoints.has(name);
+              return (
+                <g key={name} className={isProblem ? "animate-breathe" : ""}>
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={isProblem ? "16" : "9"}
+                    fill={isProblem ? "#F39A72" : "#6AC4BE"}
+                    opacity={isProblem ? "0.14" : "0.07"}
+                    filter={isProblem ? "url(#errorGlow)" : "url(#nodeGlow)"}
+                  />
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={isProblem ? "5.4" : "3.5"}
+                    fill={isProblem ? "#F39A72" : "#6AC4BE"}
+                    opacity={isProblem ? "0.96" : "0.78"}
+                    filter={isProblem ? "url(#errorGlow)" : "url(#nodeGlow)"}
+                  />
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={isProblem ? "12" : "8"}
+                    fill="none"
+                    stroke={isProblem ? "#F39A72" : "#6AC4BE"}
+                    strokeWidth="1.1"
+                    opacity={isProblem ? "0.18" : "0.1"}
+                  />
+                </g>
+              );
+            })}
+            <path
+              d="M152 132 C186 112 236 112 270 132"
+              fill="none"
+              stroke="#CDEDEA"
+              strokeWidth="8"
+              strokeLinecap="round"
+              opacity="0.42"
+            />
+          </svg>
+        );
+      }
+
+      function AIWaveform({ frame = 0, compact = false }) {
+        const bars = useMemo(() => {
+          const base = [16, 30, 48, 28, 56, 38, 24, 44, 20];
+          return base.map((height, index) => {
+            const lift = Math.sin((frame + index) * 0.82) * 9;
+            return Math.max(12, Math.round(height + lift));
+          });
+        }, [frame]);
+        const tempo = 0.82 + (frame % 3) * 0.08;
+
+        return (
+          <div
+            className={[
+              "flex items-center rounded-full border border-white/75 bg-cream/90 text-sage backdrop-blur-xl",
+              compact ? "gap-1.5 px-2 py-1 shadow-sm" : "gap-3 px-5 py-3 shadow-lifted",
+            ].join(" ")}
+          >
+            {!compact && <Icon type="sparkle" className="h-4 w-4" />}
+            <svg
+              className={compact ? "h-6 w-16" : "h-9 w-32"}
+              viewBox="0 0 128 36"
+              role="img"
+              aria-label="语音提醒正在播放"
+            >
+              <defs>
+                <linearGradient id="waveGradient" x1="0" x2="1" y1="0" y2="0">
+                  <stop offset="0%" stopColor="#6AC4BE" stopOpacity="0.52" />
+                  <stop offset="55%" stopColor="#6AC4BE" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#F39A72" stopOpacity="0.62" />
+                </linearGradient>
+              </defs>
+              {bars.map((height, index) => {
+                const x = 8 + index * 13.5;
+                const y = 18 - height / 2;
+                return (
+                  <rect
+                    key={`${height}-${index}`}
+                    x={x}
+                    y={y}
+                    width="5"
+                    height={height}
+                    rx="2.5"
+                    fill="url(#waveGradient)"
+                    className="origin-center animate-wave"
+                    style={{
+                      animationDelay: `${index * 0.075}s`,
+                      animationDuration: `${tempo}s`,
+                    }}
+                  />
+                );
+              })}
+              <path
+                d="M4 18 C18 10, 26 26, 40 18 S62 10, 76 18 S98 26, 124 18"
+                fill="none"
+                stroke="#6AC4BE"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                opacity="0.22"
+              />
+            </svg>
+          </div>
+        );
+      }
+
+      function CourseInsightCard({ insight }) {
+        if (!insight) return null;
+
+        return (
+          <section className="rounded-2xl border border-white/80 bg-cream/86 p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-mist text-sage">
+                <Icon type="sparkle" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-sage">为什么这样安排</p>
+                <p className="mt-1 text-sm leading-6 text-forest/68">{insight}</p>
+              </div>
+            </div>
+          </section>
+        );
+      }
+
+      function PracticeTipPanel({ formError, pendingCorrection, coachTip, className = "" }) {
+        return (
+          <div
+            className={[
+              "mt-3 rounded-[22px] border bg-cream p-3 shadow-inset transition-all duration-500 sm:rounded-[24px] sm:p-4",
+              formError
+                ? "border-clay/35 animate-coachPulse"
+                : pendingCorrection
+                  ? "border-[#CDEDEA]"
+                  : "border-white/80",
+              className,
+            ].join(" ")}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={[
+                  "mt-1 h-2.5 w-2.5 shrink-0 rounded-full transition",
+                  formError ? "bg-clay" : pendingCorrection ? "bg-[#E7B76A]" : "bg-sage",
+                ].join(" ")}
+              />
+              <div className="min-w-0">
+                <p className={["text-sm font-semibold", formError ? "text-clay" : "text-sage"].join(" ")}>
+                  身体提示
+                </p>
+                <p className="mt-1 line-clamp-2 text-sm leading-6 text-forest/72 sm:line-clamp-none">
+                  {coachTip}
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function CoachCompanion({ speaking, formError, pendingCorrection, message, frame = 0, voiceNotice = "" }) {
+        const shortMessage = formError
+          ? "慢一点，肩膀再松一些。"
+          : pendingCorrection
+            ? "我先陪你观察一小会儿。"
+            : "很好，保持这个呼吸。";
+
+        return (
+          <div
+            className={[
+              "mt-2 flex items-center gap-3 rounded-[22px] border bg-cream p-2.5 shadow-inset transition sm:mt-3 sm:rounded-[24px] sm:p-3",
+              formError ? "border-clay/30" : "border-white/80",
+            ].join(" ")}
+          >
+            <div
+              className={[
+                "relative grid h-11 w-11 shrink-0 place-items-center rounded-[18px] border border-white/80 bg-mist shadow-sm sm:h-12 sm:w-12 sm:rounded-[20px]",
+                speaking ? "animate-breathe" : "",
+              ].join(" ")}
+              aria-label="AI 教练精灵"
+              title={message}
+            >
+              <span className="absolute -top-1 right-2 h-3 w-3 rounded-full bg-sage/28" />
+              <span className="absolute left-2 top-2 h-2 w-2 rounded-full bg-cream/80" />
+              <span className="grid h-9 w-9 place-items-center rounded-[16px] bg-night text-lime">
+                <Icon type={speaking ? "voice" : "leaf"} className="h-5 w-5" />
+              </span>
+              {speaking && (
+                <span className="absolute -inset-1 rounded-[20px] border border-sage/24" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-sage">灵瑜教练</p>
+                {speaking && <AIWaveform frame={frame} compact />}
+              </div>
+              <p className="mt-1 text-sm leading-5 text-forest/70 sm:leading-6">{shortMessage}</p>
+              {voiceNotice && (
+                <p className="mt-1 text-[11px] font-semibold text-sage/70">{voiceNotice}</p>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      function FarReadingOverlay({ poseName, timeLabel, message }) {
+        return (
+          <div className="pointer-events-none absolute inset-x-4 bottom-5 z-[2] rounded-[28px] border border-white/18 bg-night/72 p-4 text-white shadow-lifted backdrop-blur-md sm:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-white/58">远距离大字模式</p>
+                <p className="mt-1 truncate text-3xl font-semibold leading-none">
+                  {poseName}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-4 py-2 text-2xl font-semibold tabular-nums text-night">
+                {timeLabel}
+              </span>
+            </div>
+            <p className="mt-3 line-clamp-2 text-lg font-semibold leading-7 text-white/86">
+              {message}
+            </p>
+          </div>
+        );
+      }
+
+      function MobileDemoDock({ pose, expanded, compact = false, onToggle }) {
+        const targetMin = pose?.target_angle_min ?? 140;
+        const targetMax = pose?.target_angle_max ?? 180;
+        const cameraMeta = getCameraModeMeta(pose?.camera_mode_required || "half_body");
+        const demoSrc =
+          pose?.demo_media_url ||
+          createPoseDemoPlaceholder(
+            pose?.pose_name || "标准示范",
+            pose?.key_points_tip || "动作放慢，保持自然呼吸。",
+            pose?.demo_visual_key || inferDemoVisualKey(pose?.pose_name, pose?.pose_id)
+          );
+
+        return (
+          <section className={["border border-white/80 bg-cream/92 shadow-sm lg:hidden", compact ? "rounded-[22px] p-2" : "rounded-[26px] p-2.5"].join(" ")}>
+            <button
+              onClick={compact ? undefined : onToggle}
+              className={["flex w-full items-center gap-3 text-left transition", compact ? "cursor-default" : "active:scale-[0.99]"].join(" ")}
+              aria-expanded={compact ? false : expanded}
+            >
+              <div className={compact ? "relative h-14 w-14 shrink-0 overflow-hidden rounded-[18px] bg-linen" : "relative h-20 w-20 shrink-0 overflow-hidden rounded-[24px] bg-linen"}>
+                <img
+                  src={demoSrc}
+                  alt={`${pose?.pose_name || "瑜伽动作"}真人示范图`}
+                  onError={(event) => {
+                    event.currentTarget.src = DEMO_PLACEHOLDER_SVG;
+                  }}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-semibold text-sage">真人示范图</p>
+                <div className="mt-0.5 flex items-center gap-2">
+                  <h3 className="truncate text-base font-semibold text-forest">
+                    {pose?.pose_name || "猫牛式"}
+                  </h3>
+                  <span className="shrink-0 rounded-full bg-mist px-2 py-0.5 text-[11px] font-semibold text-sage">
+                    {cameraMeta.short}
+                  </span>
+                </div>
+                {!compact && (<p className="mt-1 line-clamp-1 text-xs leading-5 text-forest/58">
+                  {pose?.key_points_tip || "保持稳定呼吸，动作放慢。"}
+                </p>)}
+              </div>
+              {!compact && (<span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-mist text-sage">
+                <Icon type={expanded ? "close" : "play"} className="h-4 w-4" />
+              </span>)}
+            </button>
+
+            {expanded && (
+              <div className="mt-3 animate-settle overflow-hidden rounded-[22px] bg-linen p-2">
+                <div className="relative h-[230px] overflow-hidden rounded-[20px] bg-cream">
+                  <img
+                    src={demoSrc}
+                    alt={`${pose?.pose_name || "瑜伽动作"}真人示范图`}
+                    onError={(event) => {
+                      event.currentTarget.src = DEMO_PLACEHOLDER_SVG;
+                    }}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="mt-2 rounded-[18px] bg-cream px-3 py-2.5">
+                  <p className="text-xs font-semibold text-sage">动作要领 · {targetMin}°~{targetMax}°</p>
+                  <p className="mt-1 text-sm leading-6 text-forest/70">
+                    {pose?.key_points_tip || "保持稳定呼吸，动作放慢，停在身体舒服的位置。"}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-forest/50">{cameraMeta.helper}</p>
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      }
+
+      function DemoPoseCard({ pose, className = "" }) {
+        const targetMin = pose?.target_angle_min ?? 140;
+        const targetMax = pose?.target_angle_max ?? 180;
+        const cameraMeta = getCameraModeMeta(pose?.camera_mode_required || "half_body");
+        const demoSrc =
+          pose?.demo_media_url ||
+          createPoseDemoPlaceholder(
+            pose?.pose_name || "标准示范",
+            pose?.key_points_tip || "动作放慢，保持自然呼吸。",
+            pose?.demo_visual_key || inferDemoVisualKey(pose?.pose_name, pose?.pose_id)
+          );
+
+        return (
+          <aside className={["grid grid-cols-[108px_minmax(0,1fr)] gap-3 overflow-hidden rounded-[26px] border border-white/80 bg-cream p-3 shadow-soft sm:grid-cols-[160px_minmax(0,1fr)] sm:p-4 lg:flex lg:min-h-[650px] lg:flex-col lg:rounded-[32px]", className].join(" ")}>
+            <div className="order-2 flex min-w-0 flex-col justify-between lg:order-1">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                <p className="text-sm font-semibold text-sage">真人示范图</p>
+                <h3 className="mt-1 truncate text-xl font-semibold leading-tight text-forest sm:text-2xl">
+                  {pose?.pose_name || "猫牛式"}
+                </h3>
+                </div>
+                <span className="hidden shrink-0 rounded-full bg-night px-3 py-1 text-xs font-semibold text-lime sm:inline-flex">
+                  {cameraMeta.short}
+                </span>
+              </div>
+              <p className="mt-2 line-clamp-2 text-sm leading-6 text-forest/68 lg:hidden">
+                {pose?.key_points_tip || "保持稳定呼吸，动作放慢，停在身体舒服的位置。"}
+              </p>
+            </div>
+
+            <div className="relative order-1 h-[116px] overflow-hidden rounded-[22px] bg-linen sm:h-[152px] lg:order-2 lg:mt-4 lg:h-[430px] lg:min-h-[430px] lg:flex-none lg:rounded-[26px]">
+              <div id="demo-media" className="h-full w-full">
+                <img
+                  src={demoSrc}
+                  alt={`${pose?.pose_name || "瑜伽动作"}真人示范图`}
+                  onError={(event) => {
+                    event.currentTarget.src = DEMO_PLACEHOLDER_SVG;
+                  }}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="absolute inset-x-3 bottom-3 hidden rounded-[22px] bg-night/78 p-3 shadow-sm backdrop-blur-md lg:block">
+                <p className="text-xs font-semibold text-lime/70">动作要领</p>
+                <p className="mt-1 text-sm leading-6 text-white/78">
+                  {pose?.key_points_tip || "保持稳定呼吸，动作放慢，停在身体舒服的位置。"}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-white/50">
+                  {cameraMeta.helper} · {targetMin}°~{targetMax}°
+                </p>
+              </div>
+            </div>
+          </aside>
+        );
+      }
+
+      function ControlButton({ icon, label, onClick }) {
+        return (
+          <button
+            onClick={onClick}
+            className="flex min-h-16 flex-col items-center justify-center gap-1 rounded-[22px] bg-white/10 px-2 py-3 text-center text-xs font-semibold text-white transition hover:bg-white/16 active:translate-y-[1px] sm:min-h-14 sm:flex-row sm:gap-2 sm:text-sm"
+          >
+            <Icon type={icon} className="h-5 w-5 shrink-0 text-lime" />
+            <span className="leading-tight">{label}</span>
+          </button>
+        );
+      }
+
+      function SharePosterModal({ onClose, sessionStats, sessionSummary }) {
+        const [saved, setSaved] = useState(false);
+        const posterCanvasRef = useRef(null);
+        const metrics = buildSessionMetrics(sessionStats);
+        const durationMin = Math.max(1, Math.round((sessionStats?.durationSec || 60) / 60));
+        const posterTitle = `我完成了一次 ${durationMin} 分钟轻柔瑜伽。`;
+        const posterNote =
+          sessionSummary?.ai_feedback ||
+          "动作不用很大，能觉察到身体变化就很好。";
+        const bestPoseName = sessionStats?.bestPoseName || "今日高光体式";
+
+        useEffect(() => {
+          const handleKeyDown = (event) => {
+            if (event.key === "Escape") onClose();
+          };
+          window.addEventListener("keydown", handleKeyDown);
+          return () => window.removeEventListener("keydown", handleKeyDown);
+        }, [onClose]);
+
+        const savePoster = () => {
+          const canvas = posterCanvasRef.current;
+          if (!canvas) return;
+
+          const ctx = canvas.getContext("2d");
+          const width = canvas.width;
+          const height = canvas.height;
+          const centerX = width / 2;
+
+          ctx.clearRect(0, 0, width, height);
+
+          const background = ctx.createLinearGradient(0, 0, width, height);
+          background.addColorStop(0, "#FFFFFF");
+          background.addColorStop(0.56, "#F7F8F2");
+          background.addColorStop(1, "#EAF8F7");
+          ctx.fillStyle = background;
+          ctx.fillRect(0, 0, width, height);
+
+          ctx.fillStyle = "rgba(106, 196, 190, 0.08)";
+          ctx.beginPath();
+          ctx.ellipse(centerX, 500, 148, 28, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = "#6AC4BE";
+          roundRect(ctx, 42, 44, 62, 62, 20);
+          ctx.fill();
+
+          ctx.fillStyle = "#FFFFFF";
+          ctx.font = "700 30px system-ui, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("瑜", 73, 84);
+
+          ctx.textAlign = "left";
+          ctx.fillStyle = "#27324A";
+          ctx.font = "700 34px system-ui, sans-serif";
+          ctx.fillText("灵瑜 AI", 122, 70);
+          ctx.fillStyle = "rgba(39, 50, 74, 0.58)";
+          ctx.font = "500 18px system-ui, sans-serif";
+          ctx.fillText(bestPoseName, 122, 100);
+
+          drawPosterSkeleton(ctx, centerX, 175, "#6AC4BE");
+
+          ctx.fillStyle = "#27324A";
+          ctx.font = "700 38px system-ui, sans-serif";
+          wrapCanvasText(ctx, posterTitle, 42, 610, 420, 46);
+
+          const statY = 725;
+          metrics.forEach((metric, index) => {
+            const x = 42 + index * 148;
+            ctx.fillStyle = "rgba(255, 253, 252, 0.74)";
+            roundRect(ctx, x, statY, 124, 92, 24);
+            ctx.fill();
+            ctx.fillStyle = "#6AC4BE";
+            ctx.font = "700 28px system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(metric.value.replace("分钟", "分"), x + 62, statY + 42);
+            ctx.fillStyle = "rgba(39, 50, 74, 0.58)";
+            ctx.font = "600 15px system-ui, sans-serif";
+            ctx.fillText(metric.label, x + 62, statY + 70);
+          });
+
+          ctx.textAlign = "left";
+          ctx.fillStyle = "rgba(39, 50, 74, 0.66)";
+          ctx.font = "500 18px system-ui, sans-serif";
+          wrapCanvasText(ctx, posterNote.slice(0, 54), 42, 872, 420, 28);
+
+          const link = document.createElement("a");
+          link.download = "lingyu-ai-daka-poster.png";
+          link.href = canvas.toDataURL("image/png");
+          link.click();
+          setSaved(true);
+        };
+
+        return (
+          <div
+            className="fixed inset-0 z-20 flex items-center justify-center overflow-y-auto bg-forest/24 px-4 py-4 backdrop-blur-sm sm:py-8"
+            onClick={(event) => {
+              if (event.target === event.currentTarget) onClose();
+            }}
+            role="presentation"
+          >
+            <section
+              className="relative my-auto max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl bg-cream p-4 shadow-soft shadow-inset sm:max-h-[calc(100dvh-4rem)] sm:p-5"
+              role="dialog"
+              aria-modal="true"
+              aria-label="分享卡预览"
+            >
+              <button
+                onClick={onClose}
+                className="absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-linen text-forest shadow-sm transition hover:bg-sand/55 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/35"
+                aria-label="关闭分享卡"
+              >
+                <Icon type="close" />
+              </button>
+
+              <div className="overflow-hidden rounded-2xl bg-linen">
+                <div className="relative min-h-[640px] p-6">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_10%,rgba(255,253,252,1),rgba(232,220,209,0.58)_45%,rgba(90,122,102,0.16))]" />
+                  <div className="relative flex h-full min-h-[588px] flex-col">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sage text-white">
+                        <Icon type="leaf" />
+                      </span>
+                      <div>
+                        <p className="text-lg font-semibold text-forest">灵瑜 AI</p>
+                        <p className="text-xs text-forest/58">{bestPoseName}</p>
+                      </div>
+                    </div>
+
+                    <div className="my-7 rounded-2xl bg-cream/78 p-3 shadow-lifted">
+                      <div className="camera-surface relative min-h-[360px] overflow-hidden rounded-2xl">
+                        <div className="mat-perspective absolute bottom-8 left-1/2 h-[210px] w-[190px] -translate-x-1/2 rounded-[30px] bg-sage/10" />
+                        <SkeletonOverlay compact />
+                      </div>
+                    </div>
+
+                    <div className="mt-auto">
+                      <p className="text-3xl font-semibold leading-tight text-forest">
+                        {posterTitle}
+                      </p>
+                      <div className="mt-5 grid grid-cols-3 gap-2">
+                        {metrics.map((metric) => (
+                          <div key={metric.label} className="rounded-2xl bg-cream/82 p-3 text-center">
+                            <p className="text-xl font-semibold text-sage">{metric.value.replace("分钟", "分")}</p>
+                            <p className="mt-1 text-[11px] font-semibold text-forest/58">{metric.label}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-5 text-sm leading-6 text-forest/66">
+                        {posterNote}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <canvas
+                  ref={posterCanvasRef}
+                  width="512"
+                  height="960"
+                  className="hidden"
+                  aria-hidden="true"
+                />
+                <p className="text-sm text-forest/58" aria-live="polite">
+                  {saved ? "打卡海报已生成" : "适合发到社交平台的练习卡片"}
+                </p>
+                <button
+                  onClick={savePoster}
+                  className="whitespace-nowrap rounded-xl bg-sage px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#657BEA] active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/35"
+                >
+                  {saved ? "再次保存" : "一键保存打卡海报"}
+                </button>
+                <button
+                  onClick={onClose}
+                  className="rounded-xl border border-sand bg-cream px-4 py-2 text-sm font-semibold text-forest transition hover:bg-sand/45 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sage/35"
+                >
+                  关闭
+                </button>
+              </div>
+            </section>
+          </div>
+        );
+      }
+
+      function roundRect(ctx, x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + width, y, x + width, y + height, r);
+        ctx.arcTo(x + width, y + height, x, y + height, r);
+        ctx.arcTo(x, y + height, x, y, r);
+        ctx.arcTo(x, y, x + width, y, r);
+        ctx.closePath();
+      }
+
+      function drawPosterSkeleton(ctx, centerX, top, color) {
+        const points = {
+          head: [centerX, top + 38],
+          neck: [centerX, top + 94],
+          shoulderL: [centerX - 58, top + 132],
+          shoulderR: [centerX + 58, top + 132],
+          elbowL: [centerX - 82, top + 208],
+          elbowR: [centerX + 82, top + 208],
+          handL: [centerX - 96, top + 280],
+          handR: [centerX + 96, top + 280],
+          hipL: [centerX - 38, top + 264],
+          hipR: [centerX + 38, top + 264],
+          kneeL: [centerX - 54, top + 360],
+          kneeR: [centerX + 54, top + 360],
+          ankleL: [centerX - 70, top + 458],
+          ankleR: [centerX + 70, top + 458],
+        };
+        const lines = [
+          ["head", "neck"],
+          ["neck", "shoulderL"],
+          ["neck", "shoulderR"],
+          ["shoulderL", "elbowL"],
+          ["elbowL", "handL"],
+          ["shoulderR", "elbowR"],
+          ["elbowR", "handR"],
+          ["neck", "hipL"],
+          ["neck", "hipR"],
+          ["hipL", "hipR"],
+          ["hipL", "kneeL"],
+          ["kneeL", "ankleL"],
+          ["hipR", "kneeR"],
+          ["kneeR", "ankleR"],
+        ];
+
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.shadowColor = "rgba(106, 196, 190, 0.22)";
+        ctx.shadowBlur = 18;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 8;
+        lines.forEach(([from, to]) => {
+          const a = points[from];
+          const b = points[to];
+          ctx.beginPath();
+          ctx.moveTo(a[0], a[1]);
+          ctx.lineTo(b[0], b[1]);
+          ctx.stroke();
+        });
+
+        Object.values(points).forEach(([x, y]) => {
+          ctx.fillStyle = "rgba(106, 196, 190, 0.16)";
+          ctx.beginPath();
+          ctx.arc(x, y, 22, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(x, y, 10, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.restore();
+      }
+
+      function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+        let line = "";
+        let currentY = y;
+        for (const char of text) {
+          const testLine = line + char;
+          if (ctx.measureText(testLine).width > maxWidth && line) {
+            ctx.fillText(line, x, currentY);
+            line = char;
+            currentY += lineHeight;
+          } else {
+            line = testLine;
+          }
+        }
+        if (line) ctx.fillText(line, x, currentY);
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
+
