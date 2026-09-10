@@ -1072,8 +1072,8 @@
         if (!point) return false;
         const visibility = Number(point.visibility);
         const presence = Number(point.presence);
-        if (Number.isFinite(visibility)) return visibility > 0.18;
-        if (Number.isFinite(presence)) return presence > 0.18;
+        if (Number.isFinite(visibility)) return visibility > 0.3;
+        if (Number.isFinite(presence)) return presence > 0.3;
         return true;
       }
 
@@ -1081,6 +1081,44 @@
         return Array.isArray(landmarks)
           ? landmarks.reduce((count, point) => count + (isReliableLandmark(point) ? 1 : 0), 0)
           : 0;
+      }
+
+      function landmarkConfidence(point) {
+        if (!point) return 0;
+        const visibility = Number(point.visibility);
+        const presence = Number(point.presence);
+        if (Number.isFinite(visibility) && Number.isFinite(presence)) {
+          return Math.min(visibility, presence);
+        }
+        if (Number.isFinite(visibility)) return visibility;
+        if (Number.isFinite(presence)) return presence;
+        return 1;
+      }
+
+      function smoothPoseLandmarks(rawLandmarks, previousLandmarks) {
+        if (!Array.isArray(rawLandmarks) || rawLandmarks.length < 33) return [];
+        const previous = Array.isArray(previousLandmarks) ? previousLandmarks : [];
+        return rawLandmarks.map((point, index) => {
+          if (!point) return previous[index] || point;
+          const confidence = landmarkConfidence(point);
+          const last = previous[index];
+          if (!last || confidence >= 0.82) return { ...point };
+          if (confidence < 0.24) return last ? { ...last, visibility: Math.min(landmarkConfidence(last), confidence) } : { ...point };
+
+          const dx = point.x - last.x;
+          const dy = point.y - last.y;
+          const jump = Math.sqrt(dx * dx + dy * dy);
+          const confidenceAlpha = confidence > 0.62 ? 0.32 : 0.18;
+          const alpha = jump > 0.055 ? Math.min(confidenceAlpha, 0.14) : confidenceAlpha;
+
+          return {
+            ...point,
+            x: last.x + dx * alpha,
+            y: last.y + dy * alpha,
+            z: Number.isFinite(point.z) && Number.isFinite(last.z) ? last.z + (point.z - last.z) * alpha : point.z,
+            visibility: confidence,
+          };
+        });
       }
 
 
@@ -2746,6 +2784,7 @@
         const currentPoseRef = useRef(currentPose);
         const deviationStartedAtRef = useRef(null);
         const lastPoseUiUpdateRef = useRef(0);
+        const smoothedLandmarksRef = useRef([]);
         const poseHealthRef = useRef({ noPoseSince: null, lastHintAt: 0, lastSendErrorAt: 0 });
         const errorEpisodeReportedRef = useRef(false);
         const [useMock, setUseMock] = useState(demoMode);
@@ -2876,6 +2915,7 @@
         const resetPoseFeedback = () => {
           deviationStartedAtRef.current = null;
           errorEpisodeReportedRef.current = false;
+          smoothedLandmarksRef.current = [];
           setPendingCorrection(false);
           setDebounceProgress(0);
           if (formErrorRef.current) {
@@ -3032,7 +3072,9 @@
               });
               pose.onResults((results) => {
                 if (cancelled) return;
-                const landmarks = results.poseLandmarks || [];
+                const rawLandmarks = results.poseLandmarks || [];
+                const landmarks = smoothPoseLandmarks(rawLandmarks, smoothedLandmarksRef.current);
+                smoothedLandmarksRef.current = landmarks;
                 const reliableCount = countReliableLandmarks(landmarks);
                 const health = poseHealthRef.current;
                 const now = performance.now();
@@ -4325,4 +4367,5 @@
     </script>
   </body>
 </html>
+
 
