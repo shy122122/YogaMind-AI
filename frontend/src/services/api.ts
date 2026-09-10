@@ -2,6 +2,34 @@ import type { CourseResponse, FocusTarget, SessionStats, SessionSummary } from "
 import { buildFallbackCourse, fallbackSummary } from "../data/fallbackCourse";
 
 const DEFAULT_API_BASE = "http://localhost:8000";
+type BackendErrorCounts = {
+  shoulder_high: number;
+  knee_inward: number;
+  spine_rounding: number;
+  hip_shift: number;
+  posture_adjust: number;
+};
+
+function normalizeErrorCounts(errorCounts: Record<string, number>): BackendErrorCounts {
+  const normalized: BackendErrorCounts = {
+    shoulder_high: 0,
+    knee_inward: 0,
+    spine_rounding: 0,
+    hip_shift: 0,
+    posture_adjust: 0,
+  };
+
+  Object.entries(errorCounts).forEach(([key, value]) => {
+    const count = Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+    if (key in normalized) {
+      normalized[key as keyof BackendErrorCounts] += count;
+    } else {
+      normalized.posture_adjust += count;
+    }
+  });
+
+  return normalized;
+}
 
 function apiBaseUrl() {
   const params = new URLSearchParams(window.location.search);
@@ -32,7 +60,7 @@ export async function generateCourse(targetFocus: FocusTarget): Promise<{ course
       body: JSON.stringify({ user_level: "beginner", target_focus: targetFocus, duration_minutes: 10 }),
     });
 
-    if (!course?.poses?.[0]?.target_angle_min || !course?.poses?.[0]?.target_angle_max) {
+    if (course?.poses?.[0]?.target_angle_min == null || course?.poses?.[0]?.target_angle_max == null) {
       throw new Error("课程结构不完整");
     }
     return { course, offline: false };
@@ -53,7 +81,7 @@ export async function submitSession(courseId: string, stats: SessionStats): Prom
         course_id: courseId,
         actual_duration_sec: stats.durationSec,
         accuracy_score: stats.accuracyScore,
-        error_counts: stats.errorCounts,
+        error_counts: normalizeErrorCounts(stats.errorCounts),
       }),
     });
     return { summary, offline: false };
@@ -61,3 +89,5 @@ export async function submitSession(courseId: string, stats: SessionStats): Prom
     return { summary: fallbackSummary, offline: true };
   }
 }
+
+

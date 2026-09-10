@@ -24,6 +24,7 @@ export interface CourseResponse {
   total_duration_sec: number;
   plan_reason?: string;
   poses: PoseItem[];
+  source?: "llm" | "fallback";
 }
 
 export interface SessionSummary {
@@ -32,6 +33,7 @@ export interface SessionSummary {
   ai_feedback: string;
   badge_awarded: string;
   next_practice_suggestion?: string;
+  source?: "llm" | "fallback";
 }
 
 export interface Landmark {
@@ -67,3 +69,5 @@ export interface SessionStats {
   accuracyScore: number;
   errorCounts: Record<string, number>;
 }
+
+

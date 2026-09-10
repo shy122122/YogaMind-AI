@@ -73,6 +73,7 @@ DEFAULT_COURSE: dict[str, Any] = {
     "course_id": "course_fallback",
     "course_title": "10分钟肩颈舒缓放松跟练",
     "total_duration_sec": 600,
+    "source": "fallback",
     "plan_reason": "根据你的练习目标和安全边界，今天先从低强度呼吸、肩颈放松和脊柱唤醒开始，帮助身体慢慢进入状态。",
     "poses": [
         {
@@ -244,6 +245,7 @@ DEFAULT_FEEDBACK: dict[str, str] = {
     "ai_feedback": "今天你完成了完整练习，整体节奏很稳定。下次继续保持沉肩呼吸，把动作幅度放小一点，让身体慢慢进入节奏。",
     "badge_awarded": "稳定呼吸练习者",
     "next_practice_suggestion": "下次可以继续做 8 分钟肩颈舒缓，保持今天这种不着急的节奏。",
+    "source": "fallback",
 }
 
 
@@ -419,6 +421,8 @@ def fallback_session_summary(request: SessionSubmitRequest) -> SessionSubmitResp
         detail.append(f"有 {errors.spine_rounding} 次脊柱线条不够舒展")
     if errors.hip_shift:
         detail.append(f"有 {errors.hip_shift} 次骨盆轻微偏移")
+    if errors.posture_adjust:
+        detail.append(f"收到 {errors.posture_adjust} 次姿势微调提醒")
     detail_text = "，".join(detail) if detail else "动作整体很平稳"
 
     payload = deepcopy(DEFAULT_FEEDBACK)
@@ -445,6 +449,7 @@ def _build_next_practice_suggestion(request: SessionSubmitRequest) -> str:
         (errors.knee_inward, "下次建议做 8 分钟下肢稳定练习，先练脚掌踩稳和膝盖朝向脚尖。"),
         (errors.spine_rounding, "下次建议做 8 分钟脊柱唤醒，让背部一节一节慢慢活动开。"),
         (errors.hip_shift, "下次建议做 7 分钟骨盆稳定练习，动作小一点，先找左右平衡。"),
+        (errors.posture_adjust, "下次建议从 6 分钟基础动作开始，先把身体方向和入镜位置调舒服。"),
     ]
     count, text = max(candidates, key=lambda item: item[0])
     if count > 0:
@@ -498,7 +503,7 @@ plan_reason 必须解释今天为什么这样排课，控制在 80 字以内，�
 poses 中的 cv_rule_key 必须从以下值选择：
 shoulder_relax, spine_extension, knee_alignment, hip_stability。
 poses 中的 correction_error_key 必须从以下值选择：
-shoulder_high, knee_inward, spine_rounding, hip_shift。
+shoulder_high, knee_inward, spine_rounding, hip_shift, posture_adjust。
 poses 中的 camera_mode_required 必须从以下值选择：
 half_body, full_body, mat_view。
 poses 中的 demo_visual_key 必须从以下值选择：
@@ -513,6 +518,7 @@ key_points_tip 必须是 1-2 句简洁动作要领，适合直接显示在跟练
 target_angle_min / target_angle_max 必须与前端 MediaPipe 角度判定对齐；
 新手默认建议使用 140-180 度，肩颈放松可使用 150-180 度。
 课程总时长 total_duration_sec 必须等于 duration_minutes * 60。
+source 字段必须返回 llm。
 语言风格要像温柔私教，不要像医疗诊断或考试评分。
 """
         user_payload = {
@@ -550,6 +556,8 @@ target_angle_min / target_angle_max 必须与前端 MediaPipe 角度判定对齐
                 if parsed is None:
                     raise ValueError("LLM 未返回可解析的 CourseGenerateResponse。")
 
+            parsed = parsed.model_copy(update={"source": "llm"})
+            logger.info("智能排课 LLM 调用成功，course_id=%s", parsed.course_id)
             return _ensure_course_matches_request(
                 parsed, request.duration_minutes * 60
             )
@@ -574,8 +582,10 @@ target_angle_min / target_angle_max 必须与前端 MediaPipe 角度判定对齐
 next_practice_suggestion 必须给出下一次练习建议，控制在 60 字以内。
 error_counts 中的 key 与前端 MediaPipe 纠错规则一一对应：
 shoulder_high 表示耸肩，knee_inward 表示膝盖内扣，
-spine_rounding 表示脊柱线条不够舒展，hip_shift 表示骨盆偏移。
+spine_rounding 表示脊柱线条不够舒展，hip_shift 表示骨盆偏移，
+posture_adjust 表示通用姿势微调提醒。
 总结要明确点出最主要的 1-2 个微调建议，但语气必须陪伴式。
+source 字段必须返回 llm。
 避免羞辱、命令、过度医疗化表达。
 """
         user_payload = {
@@ -594,7 +604,10 @@ spine_rounding 表示脊柱线条不够舒展，hip_shift 表示骨盆偏移。
                     system_prompt=system_prompt,
                     user_payload=user_payload,
                 )
-                return SessionSubmitResponse.model_validate(payload)
+                parsed = SessionSubmitResponse.model_validate(payload)
+                parsed = parsed.model_copy(update={"source": "llm"})
+                logger.info("课后总结 LLM 调用成功，session_id=%s", parsed.session_id)
+                return parsed
 
             completion = await client.beta.chat.completions.parse(
                 model=self.model,
@@ -607,7 +620,11 @@ spine_rounding 表示脊柱线条不够舒展，hip_shift 表示骨盆偏移。
             parsed = completion.choices[0].message.parsed
             if parsed is None:
                 raise ValueError("LLM 未返回可解析的 SessionSubmitResponse。")
+            parsed = parsed.model_copy(update={"source": "llm"})
+            logger.info("课后总结 LLM 调用成功，session_id=%s", parsed.session_id)
             return parsed
         except Exception as exc:
             logger.exception("课后总结 LLM 调用失败，已返回兜底评语：%s", exc)
             return fallback
+
+

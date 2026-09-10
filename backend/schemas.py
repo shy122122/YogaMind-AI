@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List
+from typing import List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -83,6 +83,7 @@ class CorrectionErrorKey(str, Enum):
     KNEE_INWARD = "knee_inward"
     SPINE_ROUNDING = "spine_rounding"
     HIP_SHIFT = "hip_shift"
+    POSTURE_ADJUST = "posture_adjust"
 
 
 class CourseGenerateRequest(BaseModel):
@@ -178,6 +179,7 @@ class CourseGenerateResponse(BaseModel):
                 "course_id": "course_12345",
                 "course_title": "10分钟肩颈舒缓放松跟练",
                 "total_duration_sec": 600,
+                "source": "llm",
                 "plan_reason": "根据你的肩颈舒缓目标和当前身体偏僵状态，今天先用低强度动作打开肩颈和脊柱。",
                 "poses": [
                     {
@@ -202,6 +204,9 @@ class CourseGenerateResponse(BaseModel):
     course_id: str = Field(..., description="课程 ID")
     course_title: str = Field(..., description="课程标题")
     total_duration_sec: int = Field(..., ge=60, description="课程总时长，单位：秒")
+    source: Literal["llm", "fallback"] = Field(
+        "fallback", description="数据来源：llm 表示大模型生成，fallback 表示本地兜底"
+    )
     plan_reason: str = Field(
         "今天先从低强度动作开始，帮助身体慢慢进入练习状态。",
         min_length=1,
@@ -223,6 +228,7 @@ class ErrorCounts(BaseModel):
     knee_inward: int = Field(0, ge=0, description="膝盖内扣次数")
     spine_rounding: int = Field(0, ge=0, description="脊柱塌腰或过度含胸次数")
     hip_shift: int = Field(0, ge=0, description="骨盆左右偏移次数")
+    posture_adjust: int = Field(0, ge=0, description="通用姿势微调提醒次数")
 
 
 class SessionSubmitRequest(BaseModel):
@@ -239,6 +245,7 @@ class SessionSubmitRequest(BaseModel):
                     "knee_inward": 1,
                     "spine_rounding": 0,
                     "hip_shift": 0,
+                    "posture_adjust": 0,
                 },
             }
         }
@@ -264,6 +271,7 @@ class SessionSubmitResponse(BaseModel):
                 "ai_feedback": "今天你坚持完成了近 10 分钟的练习！整体标准率达到了 85%。练习过程中你偶尔有 3 次耸肩，下次记得保持沉肩呼吸哦！",
                 "badge_awarded": "肩颈舒缓小能手",
                 "next_practice_suggestion": "下次建议继续做 8 分钟肩颈舒缓，把注意力放在沉肩和呼气上。",
+                "source": "llm",
             }
         }
     )
@@ -278,6 +286,9 @@ class SessionSubmitResponse(BaseModel):
         max_length=180,
         description="下一次练习建议",
     )
+    source: Literal["llm", "fallback"] = Field(
+        "fallback", description="数据来源：llm 表示大模型生成，fallback 表示本地兜底"
+    )
 
 
 class HealthResponse(BaseModel):
@@ -285,3 +296,5 @@ class HealthResponse(BaseModel):
 
     status: str = "ok"
     service: str = "YogaMind AI Backend"
+
+

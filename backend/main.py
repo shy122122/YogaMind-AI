@@ -37,7 +37,8 @@ app = FastAPI(
 # - 电脑本机：http://localhost:任意端口、http://127.0.0.1:任意端口
 # - 手机联调：http://10.x.x.x:任意端口、http://192.168.x.x:任意端口、
 #   http://172.16-31.x.x:任意端口
-# - HTTPS 临时隧道：https://*.trycloudflare.com、https://*.loca.lt
+# - HTTPS 临时隧道：https://*.trycloudflare.com、https://*.loca.lt、https://*.lhr.life
+# - GitHub Pages 展示：https://shy122122.github.io
 cors_origin_regex = os.getenv(
     "BACKEND_CORS_ORIGIN_REGEX",
     (
@@ -47,7 +48,9 @@ cors_origin_regex = os.getenv(
         r"192\.168\.\d{1,3}\.\d{1,3}|"
         r"172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}|"
         r"[\w-]+\.trycloudflare\.com|"
-        r"[\w-]+\.loca\.lt"
+        r"[\w-]+\.loca\.lt|"
+        r"[\w-]+\.lhr\.life|"
+        r"shy122122\.github\.io"
         r")(:\d+)?$"
     ),
 )
@@ -57,6 +60,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:8000",
         "http://127.0.0.1:8000",
+        "https://shy122122.github.io",
     ],
     allow_origin_regex=cors_origin_regex,
     allow_credentials=True,
@@ -121,6 +125,7 @@ async def submit_session(
                     "knee_inward": 1,
                     "spine_rounding": 0,
                     "hip_shift": 0,
+                    "posture_adjust": 0,
                 },
             }
         ],
@@ -132,3 +137,6 @@ async def submit_session(
     """
 
     return await llm_service.generate_session_summary(request)
+
+
+

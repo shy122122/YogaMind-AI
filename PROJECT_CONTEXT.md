@@ -107,6 +107,7 @@ Vite 需要保留 `allowedHosts`，否则 `loca.lt`、`lhr.life` 等隧道会出
 - React 练习页第一版迁移：手机优先训练页、示范浮层、远距离大字模式、AI 教练卡、演示控制条。
 - React 总结页第一版迁移：练习指标、主要进步、下次建议、徽章展示、本地 Canvas 打卡海报保存。
 - GitHub Pages 自动部署配置，支持稳定手机公网访问。
+- 作品集包装文档：README、产品 PRD、3 分钟演示脚本。
 
 ## 已知问题
 
@@ -120,8 +121,9 @@ Vite 需要保留 `allowedHosts`，否则 `loca.lt`、`lhr.life` 等隧道会出
 1. 保持旧 H5 作为当前展示版，不破坏可演示路径。
 2. 将旧 H5 的准备页和新手引导迁移到 React。
 3. 再迁移练习页，重点复刻手机视觉、远距离模式和 AI 教练提示。
-4. 抽象动作知识库，沉淀每个体式的入门姿势、角度规则、常见错误、纠错话术和禁忌。
-5. 最后让 `frontend/src` 成为主版本，旧 H5 退为备份。
+4. 补手机截图和演示视频，放入 `docs/images/`，完善作品集展示材料。
+5. 抽象动作知识库，沉淀每个体式的入门姿势、角度规则、常见错误、纠错话术和禁忌。
+6. 最后让 `frontend/src` 成为主版本，旧 H5 退为备份。
 
 ## 基础验收清单
 
@@ -132,6 +134,18 @@ Vite 需要保留 `allowedHosts`，否则 `loca.lt`、`lhr.life` 等隧道会出
 - localtunnel 链接不再出现 Vite `host is not allowed`。
 - 手机能访问 `https://{subdomain}.loca.lt/yogamind-ai.html?api=offline`。
 - GitHub Pages workflow 运行成功后，手机能访问 `https://shy122122.github.io/YogaMind-AI/react.html?api=offline`。
+## 2026-09-10 后端稳定性修复记录
 
+本轮补齐了前后端 API 契约的稳定性：
 
+- `CourseGenerateResponse` 和 `SessionSubmitResponse` 新增 `source: "llm" | "fallback"`，方便判断当前结果是真实大模型生成还是本地兜底。
+- `ErrorCounts` 新增 `posture_adjust`，用于承接前端通用姿势微调次数，避免总结接口因为未知字段返回 422。
+- React 接口层在提交课后总结前会规整 `errorCounts`，未知错误类型自动合并进 `posture_adjust`。
+- 后端 CORS 放行补充 `lhr.life` 隧道和 `shy122122.github.io`，减少手机公网预览和 Pages 展示时的跨域问题。
+- `.env.example` 补充 DeepSeek 推荐配置：`OPENAI_BASE_URL=https://api.deepseek.com`、`OPENAI_MODEL=deepseek-chat`。
+
+本轮验证：
+
+- `python -m py_compile backend\main.py backend\schemas.py backend\llm_service.py` 通过。
+- `frontend` 下 `npm run build` 通过。
 
