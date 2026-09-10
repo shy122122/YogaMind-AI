@@ -5,10 +5,10 @@ export function DemoPoseCard({ pose, compact = false }: { pose: PoseItem; compac
     <section className={["rounded-[26px] bg-white/95 p-2.5 shadow-card", compact ? "flex items-center gap-3" : ""].join(" ")}>
       <div className={["overflow-hidden rounded-[22px] bg-cream", compact ? "h-16 w-16 shrink-0" : "h-56"].join(" ")}>
         <img
-          src={pose.demo_media_url || "/assets/demo/standing_breath.png"}
+          src={pose.demo_media_url || `${import.meta.env.BASE_URL}assets/demo/standing_breath.png`}
           alt={`${pose.pose_name}示范图`}
           className="h-full w-full object-cover"
-          onError={(event) => { event.currentTarget.src = "/assets/demo/standing_breath.png"; }}
+          onError={(event) => { event.currentTarget.src = `${import.meta.env.BASE_URL}assets/demo/standing_breath.png`; }}
         />
       </div>
       <div className={compact ? "min-w-0" : "mt-3"}>
@@ -19,3 +19,4 @@ export function DemoPoseCard({ pose, compact = false }: { pose: PoseItem; compac
     </section>
   );
 }
+

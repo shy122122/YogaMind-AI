@@ -15,7 +15,7 @@ YogaMind AI 是一个面向 C 端瑜伽小白的移动端 H5 体验版 Demo。�
 - `outputs/yogamind-ai.html`：原始完整 H5 展示版。
 - `mobile-preview/yogamind-ai.html`：手机预览版 H5。
 - `frontend/public/yogamind-ai.html`：当前 Vite 服务默认打开的完整 H5 展示页。
-- `frontend/src/`：React + TypeScript 工程化主线，后续逐步接管旧 H5。
+- `frontend/src/`：React + TypeScript 工程化主线，已完成准备页、新手引导、练习页和总结页第一版迁移，后续逐步接管旧 H5。
 - `backend/`：FastAPI 后端，提供 LLM 排课和课后总结 API。
 
 ## 展示入口
@@ -38,6 +38,13 @@ http://10.51.19.73:5173/yogamind-ai.html?api=offline
 https://{localtunnel-subdomain}.loca.lt/yogamind-ai.html?api=offline
 ```
 
+
+GitHub Pages 稳定展示入口：
+
+```text
+https://shy122122.github.io/YogaMind-AI/yogamind-ai.html?api=offline
+https://shy122122.github.io/YogaMind-AI/react.html?api=offline
+```
 React 工程版预览入口：
 
 ```text
@@ -81,7 +88,7 @@ npm run dev
 npx --yes --registry=https://registry.npmmirror.com --cache ..\.npm-cache localtunnel --port 5173
 ```
 
-Vite 需要保留 `allowedHosts`，否则 `loca.lt` 隧道会出现 `host is not allowed`。
+Vite 需要保留 `allowedHosts`，否则 `loca.lt`、`lhr.life` 等隧道会出现 `host is not allowed`。GitHub Pages 构建时使用 `/YogaMind-AI/` base，本地开发仍使用 `/`。
 
 ## 已完成能力
 
@@ -97,13 +104,16 @@ Vite 需要保留 `allowedHosts`，否则 `loca.lt` 隧道会出现 `host is not
 - FastAPI + Pydantic v2 后端。
 - DeepSeek/OpenAI 兼容 LLM 调用与 fallback。
 - React + TypeScript 工程化基座。
+- React 练习页第一版迁移：手机优先训练页、示范浮层、远距离大字模式、AI 教练卡、演示控制条。
+- React 总结页第一版迁移：练习指标、主要进步、下次建议、徽章展示、本地 Canvas 打卡海报保存。
+- GitHub Pages 自动部署配置，支持稳定手机公网访问。
 
 ## 已知问题
 
-- 默认展示仍依赖旧 H5，React 工程还没有完全复刻旧版视觉和交互。
+- 默认展示仍依赖旧 H5，React 工程已跑通准备、练习、总结主流程，但视觉细节和真机体验还需要继续对齐旧 H5。
 - 动作识别规则仍是 MVP 级模板判断，不是完整瑜伽动作知识库。
 - 手机摄像头全身入镜时，用户距离屏幕较远，主要依赖大字模式和语音提示缓解。
-- localtunnel 临时链接不稳定，断开后需要重新生成。
+- localtunnel / localhost.run 临时链接不稳定，断开后需要重新生成；正式展示优先使用 GitHub Pages。
 
 ## 下一步计划
 
@@ -121,3 +131,7 @@ Vite 需要保留 `allowedHosts`，否则 `loca.lt` 隧道会出现 `host is not
 - `http://localhost:5173/react.html?api=offline` 可打开 React 工程版。
 - localtunnel 链接不再出现 Vite `host is not allowed`。
 - 手机能访问 `https://{subdomain}.loca.lt/yogamind-ai.html?api=offline`。
+- GitHub Pages workflow 运行成功后，手机能访问 `https://shy122122.github.io/YogaMind-AI/react.html?api=offline`。
+
+
+

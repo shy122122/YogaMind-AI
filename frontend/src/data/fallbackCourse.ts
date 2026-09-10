@@ -1,6 +1,6 @@
 import type { CourseResponse, FocusTarget, SessionSummary } from "../types/domain";
 
-const asset = (name: string) => `/assets/demo/${name}.png`;
+const asset = (name: string) => `${import.meta.env.BASE_URL}assets/demo/${name}.png`;
 
 export const fallbackCourse: CourseResponse = {
   course_id: "course_local_fallback",
@@ -83,3 +83,4 @@ export function buildFallbackCourse(targetFocus: FocusTarget): CourseResponse {
     plan_reason: `已为你准备一套偏${focusLabel}的离线课表，适合第一次体验。`,
   };
 }
+
