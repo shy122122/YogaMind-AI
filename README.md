@@ -20,6 +20,14 @@ https://shy122122.github.io/YogaMind-AI/react.html?api=offline
 
 说明：当前对外展示建议优先使用 `yogamind-ai.html`。`react.html` 是工程化迁移版本，用于展示后续正式产品架构。
 
+## 投递材料
+
+- [产品 PRD 投递增强版（PDF）](docs/portfolio/YogaMind-AI-PRD-portfolio.pdf)
+- [产品 PRD 投递增强版（Word）](docs/portfolio/YogaMind-AI-PRD-portfolio.docx)
+- [手机端练习页截图](docs/portfolio/screenshots/03-practice-phone.png)
+
+说明：当前产品仍是可演示 Demo，重点展示移动端练习流程、姿态识别反馈、权限兜底和课后总结等产品设计能力。姿态识别受光线、距离、身体出框等因素影响，目前仍存在关键点抖动和骨架不稳定问题，后续需要通过低置信点过滤、关键点平滑、动作状态机优化和真实样本评测继续迭代。
+
 ## 项目背景
 
 线下瑜伽私教价格较高，普通视频跟练又缺少实时反馈。新手用户常见问题是：不知道自己动作是否正确、害怕受伤、独自练习缺少陪伴，最终难以坚持。
