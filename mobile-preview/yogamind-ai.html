@@ -1070,6 +1070,7 @@
 
       function isReliableLandmark(point) {
         if (!point) return false;
+        if (!Number.isFinite(Number(point.x)) || !Number.isFinite(Number(point.y))) return false;
         const visibility = Number(point.visibility);
         const presence = Number(point.presence);
         if (Number.isFinite(visibility)) return visibility > 0.3;
@@ -1095,21 +1096,45 @@
         return 1;
       }
 
+      const POSE_SMOOTH_MIN_ALPHA = 0.3;
+      const POSE_SMOOTH_MAX_ALPHA = 0.55;
+      const POSE_SMOOTH_MAX_STEP = 0.045;
+      const POSE_VIS_IN = 0.62;
+      const POSE_VIS_OUT = 0.42;
+      const POSE_HOLD_FRAMES = 6;
+
       function smoothPoseLandmarks(rawLandmarks, previousLandmarks) {
         if (!Array.isArray(rawLandmarks) || rawLandmarks.length < 33) return [];
         const previous = Array.isArray(previousLandmarks) ? previousLandmarks : [];
+
         return rawLandmarks.map((point, index) => {
-          if (!point) return previous[index] || point;
-          const confidence = landmarkConfidence(point);
           const last = previous[index];
-          if (!last || confidence >= 0.82) return { ...point };
-          if (confidence < 0.24) return last ? { ...last, visibility: Math.min(landmarkConfidence(last), confidence) } : { ...point };
+
+          if (!point) {
+            if (!last) return point;
+            const missed = (last.missed || 0) + 1;
+            return missed > POSE_HOLD_FRAMES ? { ...last, visibility: 0, missed } : { ...last, missed };
+          }
+
+          const confidence = landmarkConfidence(point);
+
+          if (!last) return { ...point, visibility: confidence >= POSE_VIS_IN ? confidence : 0, missed: 0 };
+
+          const wasVisible = (last.visibility || 0) > POSE_VIS_OUT;
+          const isVisible = wasVisible ? confidence >= POSE_VIS_OUT : confidence >= POSE_VIS_IN;
+
+          if (!isVisible) {
+            const missed = (last.missed || 0) + 1;
+            if (missed > POSE_HOLD_FRAMES) return { ...last, visibility: 0, missed };
+            return { ...last, visibility: Math.max(0.45, (last.visibility || 0) * 0.9), missed };
+          }
 
           const dx = point.x - last.x;
           const dy = point.y - last.y;
-          const jump = Math.sqrt(dx * dx + dy * dy);
-          const confidenceAlpha = confidence > 0.62 ? 0.32 : 0.18;
-          const alpha = jump > 0.055 ? Math.min(confidenceAlpha, 0.14) : confidenceAlpha;
+          const speed = Math.sqrt(dx * dx + dy * dy);
+
+          let alpha = POSE_SMOOTH_MAX_ALPHA - (POSE_SMOOTH_MAX_ALPHA - POSE_SMOOTH_MIN_ALPHA) * confidence;
+          if (speed > POSE_SMOOTH_MAX_STEP) alpha = Math.min(alpha, POSE_SMOOTH_MAX_STEP / speed);
 
           return {
             ...point,
@@ -1117,6 +1142,7 @@
             y: last.y + dy * alpha,
             z: Number.isFinite(point.z) && Number.isFinite(last.z) ? last.z + (point.z - last.z) * alpha : point.z,
             visibility: confidence,
+            missed: 0,
           };
         });
       }
@@ -1646,7 +1672,9 @@
         const errorSet = new Set(options.errorIndices || []);
         const connections = POSE_CONNECTIONS_FALLBACK;
         const points = landmarks.map((point) =>
-          mapLandmarkToCanvas(point, video, width, height, mirrored)
+          isReliableLandmark(point)
+            ? mapLandmarkToCanvas(point, video, width, height, mirrored)
+            : { x: NaN, y: NaN }
         );
         drawSkeleton(context, points, landmarks, connections, errorSet);
       }
